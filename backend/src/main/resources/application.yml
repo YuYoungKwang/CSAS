@@ -1,0 +1,6 @@
+spring:
+  application:
+    name: crack-sensing-ai-service
+
+server:
+  port: 8080

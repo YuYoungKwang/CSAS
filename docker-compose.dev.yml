@@ -1,0 +1,21 @@
+# TODO: Define local development services for frontend, backend, and python.
+# This file is a placeholder for the future Docker Compose development setup.
+
+services:
+  frontend:
+    # TODO: Build and run the React/Vite development server.
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+
+  backend:
+    # TODO: Build and run the Spring Boot development server.
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+
+  python:
+    # TODO: Build and run the Python FastAPI AI server.
+    build:
+      context: ./python
+      dockerfile: Dockerfile.dev

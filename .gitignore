@@ -1,0 +1,26 @@
+# Node
+node_modules/
+dist/
+
+# Java / Gradle
+build/
+.gradle/
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Environment
+.env
+
+# Uploads
+uploads/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Logs
+*.log
+logs/
