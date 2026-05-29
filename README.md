@@ -12,7 +12,17 @@ AI 기반 시설물 균열 감지 서비스
 
 ## 현재 상태
 
-초기 프로젝트 구조 생성 단계입니다.
+Docker Compose 기반 로컬 개발 실행 구성을 준비한 단계입니다.
+
+## 로컬 실행
+
+```bash
+docker compose -f docker-compose.dev.yml up --build
+```
+
+- Frontend: http://localhost:5173
+- Backend health: http://localhost:8080/health
+- Python AI health: http://localhost:8000/health
 
 ## 폴더 구조 설명
 
