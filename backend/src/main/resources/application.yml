@@ -2,5 +2,11 @@ spring:
   application:
     name: crack-sensing-ai-service
 
+aws:
+  region: ${AWS_REGION:ap-northeast-2}
+
+s3:
+  bucket-name: ${S3_BUCKET_NAME}
+
 server:
   port: 8080
