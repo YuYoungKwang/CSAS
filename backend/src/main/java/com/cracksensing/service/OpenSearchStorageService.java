@@ -4,7 +4,6 @@ import com.cracksensing.dto.AnalysisRecord;
 import com.cracksensing.exception.OpenSearchStorageException;
 
 import org.opensearch.client.opensearch.OpenSearchClient;
-import org.opensearch.client.opensearch.core.IndexResponse;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -31,7 +30,7 @@ public class OpenSearchStorageService {
         try {
             openSearchClient.index(index -> index
                     .index(indexName)
-                    .id(record.imageId())
+                    .id(record.objectKey())
                     .document(record)
             );
             return record;

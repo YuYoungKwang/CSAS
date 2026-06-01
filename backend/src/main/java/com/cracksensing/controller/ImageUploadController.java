@@ -25,10 +25,7 @@ public class ImageUploadController {
 
     @PostMapping("/upload")
     @ResponseStatus(HttpStatus.CREATED)
-    public AnalysisRecord uploadImage(
-            @RequestParam("file") MultipartFile file,
-            @RequestParam("userId") String userId
-    ) {
-        return s3UploadService.uploadImage(file, userId);
+    public AnalysisRecord uploadImage(@RequestParam("file") MultipartFile file) {
+        return s3UploadService.uploadImage(file);
     }
 }

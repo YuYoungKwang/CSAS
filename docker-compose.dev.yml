@@ -16,14 +16,11 @@ services:
       dockerfile: Dockerfile.dev
     ports:
       - "8080:8080"
-    depends_on:
-      - python
     environment:
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
       - AWS_REGION=${AWS_REGION}
       - S3_BUCKET_NAME=${S3_BUCKET_NAME}
-      - CLASSIFIER_BASE_URL=http://python:8000
       - OPENSEARCH_ENDPOINT=${OPENSEARCH_ENDPOINT}
       - OPENSEARCH_REGION=${OPENSEARCH_REGION}
       - OPENSEARCH_SERVICE=${OPENSEARCH_SERVICE:-es}
