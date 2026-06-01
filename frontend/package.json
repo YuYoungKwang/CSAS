@@ -8,6 +8,8 @@
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
+    "axios": "latest",
+    "lucide-react": "latest",
     "vite": "latest",
     "react": "latest",
     "react-dom": "latest"
