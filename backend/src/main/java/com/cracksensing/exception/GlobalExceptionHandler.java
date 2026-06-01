@@ -37,6 +37,18 @@ public class GlobalExceptionHandler {
         );
     }
 
+    @ExceptionHandler(ClassifierDispatchException.class)
+    public ResponseEntity<ErrorResponse> handleClassifierDispatchFailure(
+            ClassifierDispatchException exception,
+            HttpServletRequest request
+    ) {
+        return buildErrorResponse(
+                HttpStatus.BAD_GATEWAY,
+                "Image was saved to S3, but sending it to the classifier server failed.",
+                request
+        );
+    }
+
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<ErrorResponse> handleMaxUploadSizeExceeded(
             MaxUploadSizeExceededException exception,

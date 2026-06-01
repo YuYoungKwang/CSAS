@@ -36,15 +36,18 @@ public class S3UploadService {
     private static final ZoneId SEOUL_ZONE = ZoneId.of("Asia/Seoul");
 
     private final S3Client s3Client;
+    private final ClassifierClient classifierClient;
     private final String bucketName;
     private final String awsRegion;
 
     public S3UploadService(
             S3Client s3Client,
+            ClassifierClient classifierClient,
             @Value("${s3.bucket-name}") String bucketName,
             @Value("${aws.region}") String awsRegion
     ) {
         this.s3Client = s3Client;
+        this.classifierClient = classifierClient;
         this.bucketName = bucketName;
         this.awsRegion = awsRegion;
     }
@@ -70,6 +73,7 @@ public class S3UploadService {
         }
 
         String objectUrl = createObjectUrl(objectKey);
+        classifierClient.sendToClassifier(objectKey, objectUrl);
         return new ImageUploadResponse(objectKey, objectUrl, originalFileName, file.getSize());
     }
 

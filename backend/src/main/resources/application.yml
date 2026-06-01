@@ -12,5 +12,8 @@ aws:
 s3:
   bucket-name: ${S3_BUCKET_NAME}
 
+classifier:
+  base-url: ${CLASSIFIER_BASE_URL:http://localhost:8000}
+
 server:
   port: 8080
