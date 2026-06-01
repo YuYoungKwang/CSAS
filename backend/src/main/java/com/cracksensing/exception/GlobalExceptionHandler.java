@@ -2,6 +2,7 @@ package com.cracksensing.exception;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
@@ -37,6 +38,18 @@ public class GlobalExceptionHandler {
         );
     }
 
+    @ExceptionHandler(OpenSearchStorageException.class)
+    public ResponseEntity<ErrorResponse> handleOpenSearchStorageFailure(
+            OpenSearchStorageException exception,
+            HttpServletRequest request
+    ) {
+        return buildErrorResponse(
+                HttpStatus.BAD_GATEWAY,
+                "Image was analyzed, but saving the analysis record to OpenSearch failed.",
+                request
+        );
+    }
+
     @ExceptionHandler(ClassifierDispatchException.class)
     public ResponseEntity<ErrorResponse> handleClassifierDispatchFailure(
             ClassifierDispatchException exception,
@@ -65,6 +78,18 @@ public class GlobalExceptionHandler {
         return buildErrorResponse(
                 HttpStatus.BAD_REQUEST,
                 "Request must include a file part named 'file'.",
+                request
+        );
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ErrorResponse> handleMissingRequestParameter(
+            MissingServletRequestParameterException exception,
+            HttpServletRequest request
+    ) {
+        return buildErrorResponse(
+                HttpStatus.BAD_REQUEST,
+                "Request must include a userId parameter.",
                 request
         );
     }

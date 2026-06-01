@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
-import com.cracksensing.dto.ImageUploadResponse;
+import com.cracksensing.dto.AnalysisRecord;
 import com.cracksensing.service.S3UploadService;
 
 @RestController
@@ -25,7 +25,10 @@ public class ImageUploadController {
 
     @PostMapping("/upload")
     @ResponseStatus(HttpStatus.CREATED)
-    public ImageUploadResponse uploadImage(@RequestParam("file") MultipartFile file) {
-        return s3UploadService.uploadImage(file);
+    public AnalysisRecord uploadImage(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam("userId") String userId
+    ) {
+        return s3UploadService.uploadImage(file, userId);
     }
 }

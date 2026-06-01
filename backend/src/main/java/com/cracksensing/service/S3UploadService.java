@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.time.Instant;
 import java.util.Map;
 import java.util.Locale;
 import java.util.Set;
@@ -14,8 +15,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
-import com.cracksensing.dto.ImageUploadResponse;
+import com.cracksensing.dto.AnalysisRecord;
+import com.cracksensing.dto.ClassifierResponse;
 import com.cracksensing.exception.InvalidImageFileException;
+import com.cracksensing.exception.OpenSearchStorageException;
 import com.cracksensing.exception.S3UploadException;
 
 import software.amazon.awssdk.core.sync.RequestBody;
@@ -37,22 +40,25 @@ public class S3UploadService {
 
     private final S3Client s3Client;
     private final ClassifierClient classifierClient;
+    private final OpenSearchStorageService openSearchStorageService;
     private final String bucketName;
     private final String awsRegion;
 
     public S3UploadService(
             S3Client s3Client,
             ClassifierClient classifierClient,
+            OpenSearchStorageService openSearchStorageService,
             @Value("${s3.bucket-name}") String bucketName,
             @Value("${aws.region}") String awsRegion
     ) {
         this.s3Client = s3Client;
         this.classifierClient = classifierClient;
+        this.openSearchStorageService = openSearchStorageService;
         this.bucketName = bucketName;
         this.awsRegion = awsRegion;
     }
 
-    public ImageUploadResponse uploadImage(MultipartFile file) {
+    public AnalysisRecord uploadImage(MultipartFile file, String userId) {
         validateFile(file);
 
         String originalFileName = file.getOriginalFilename();
@@ -73,8 +79,22 @@ public class S3UploadService {
         }
 
         String objectUrl = createObjectUrl(objectKey);
-        classifierClient.sendToClassifier(objectKey, objectUrl);
-        return new ImageUploadResponse(objectKey, objectUrl, originalFileName, file.getSize());
+        ClassifierResponse classifierResponse = classifierClient.sendToClassifier(objectKey, objectUrl);
+        AnalysisRecord analysisRecord = new AnalysisRecord(
+                objectKey,
+                userId,
+                Instant.now(),
+                objectUrl,
+                classifierResponse.cracked(),
+                classifierResponse.crackType(),
+                classifierResponse.crackPos()
+        );
+
+        try {
+            return openSearchStorageService.save(analysisRecord);
+        } catch (OpenSearchStorageException exception) {
+            throw exception;
+        }
     }
 
     private void validateFile(MultipartFile file) {

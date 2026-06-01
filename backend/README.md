@@ -19,22 +19,30 @@ docker compose -f docker-compose.dev.yml up --build
 - Method: `POST`
 - URL: `http://localhost:8080/api/images/upload`
 - Form field: `file`
+- Form field: `userId`
 
 예시 요청:
 
 ```bash
 curl -X POST "http://localhost:8080/api/images/upload" \
+  -F "userId=user-123" \
   -F "file=@/path/to/image.jpg"
 ```
 
-성공 응답 예시:
+저장 응답 예시:
 
 ```json
 {
-  "objectKey": "images/2026/06/01/uuid.jpg",
+  "imageId": "images/2026/06/01/uuid.jpg",
+  "userId": "user-123",
+  "savedAt": "2026-06-01T10:00:00Z",
   "objectUrl": "https://bucket-name.s3.ap-northeast-2.amazonaws.com/images/2026/06/01/uuid.jpg",
-  "fileName": "image.jpg",
-  "fileSize": 123456
+  "cracked": 1,
+  "crackType": 7,
+  "crackPos": [
+    [14, 10],
+    [31, 85]
+  ]
 }
 ```
 
@@ -70,6 +78,10 @@ classifier 서버 응답 예시:
 - `AWS_REGION`: S3 리전
 - `S3_BUCKET_NAME`: 업로드 대상 버킷 이름
 - `CLASSIFIER_BASE_URL`: classifier 서버 주소
+- `OPENSEARCH_ENDPOINT`: OpenSearch 엔드포인트
+- `OPENSEARCH_REGION`: OpenSearch 리전
+- `OPENSEARCH_SERVICE`: OpenSearch 서비스 이름
+- `OPENSEARCH_INDEX_NAME`: 저장할 OpenSearch 인덱스 이름
 - `spring.servlet.multipart.max-file-size`: 단일 파일 최대 크기
 - `spring.servlet.multipart.max-request-size`: 요청 전체 최대 크기
 

@@ -15,5 +15,11 @@ s3:
 classifier:
   base-url: ${CLASSIFIER_BASE_URL:http://localhost:8000}
 
+opensearch:
+  endpoint: ${OPENSEARCH_ENDPOINT:}
+  region: ${OPENSEARCH_REGION:ap-northeast-2}
+  service: ${OPENSEARCH_SERVICE:es}
+  index-name: ${OPENSEARCH_INDEX_NAME:crack-analysis-results}
+
 server:
   port: 8080
