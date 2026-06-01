@@ -30,3 +30,129 @@ docker compose -f docker-compose.dev.yml up --build
 - `backend/`: Java 17과 Spring Boot 기반 API 서버가 위치할 예정입니다.
 - `python/`: FastAPI 기반 Python AI 서버가 위치할 예정입니다.
 - `docker-compose.dev.yml`: 로컬 Docker 개발환경 구성을 위한 placeholder입니다.
+
+## EKS deployment
+
+Use PowerShell for AWS CLI commands on Windows. Do not use the `latest` tag because ECR repositories may be tag immutable. The manual deployment examples below use `v1`; for later releases use a new tag such as `v2` or a Git SHA.
+
+Target AWS resources:
+
+- Region: `ap-northeast-2`
+- EKS cluster: `crack-sensing`
+- AWS account ID: `533267330483`
+- ECR registry: `533267330483.dkr.ecr.ap-northeast-2.amazonaws.com`
+- ECR repositories:
+  - Backend: `csas-backend`
+  - Frontend: `csas-frontend`
+  - Python AI: `csas-python`
+- Manual image tags:
+  - `533267330483.dkr.ecr.ap-northeast-2.amazonaws.com/csas-backend:v1`
+  - `533267330483.dkr.ecr.ap-northeast-2.amazonaws.com/csas-frontend:v1`
+  - `533267330483.dkr.ecr.ap-northeast-2.amazonaws.com/csas-python:v1`
+
+### 1. Check AWS CLI identity
+
+```powershell
+aws sts get-caller-identity
+aws eks update-kubeconfig --region ap-northeast-2 --name crack-sensing
+```
+
+### 2. Create missing ECR repositories
+
+`csas-backend` already exists. Create `csas-frontend` and `csas-python` if they do not exist.
+
+```powershell
+aws ecr describe-repositories `
+  --repository-names csas-frontend `
+  --region ap-northeast-2
+
+aws ecr create-repository `
+  --repository-name csas-frontend `
+  --region ap-northeast-2 `
+  --image-tag-mutability IMMUTABLE
+
+aws ecr describe-repositories `
+  --repository-names csas-python `
+  --region ap-northeast-2
+
+aws ecr create-repository `
+  --repository-name csas-python `
+  --region ap-northeast-2 `
+  --image-tag-mutability IMMUTABLE
+```
+
+If `describe-repositories` succeeds, skip the matching `create-repository` command.
+
+### 3. Clean up mistaken local images
+
+If the Python folder was accidentally built with the backend repository name, remove the wrong local tags before rebuilding.
+
+```powershell
+docker image ls "*csas-backend*"
+docker image rm csas-backend:latest
+docker image rm 533267330483.dkr.ecr.ap-northeast-2.amazonaws.com/csas-backend:latest
+```
+
+Ignore `No such image` errors. Do not try to overwrite `csas-backend:latest` in ECR.
+
+### 4. Login to ECR
+
+```powershell
+aws ecr get-login-password --region ap-northeast-2 `
+  | docker login --username AWS --password-stdin 533267330483.dkr.ecr.ap-northeast-2.amazonaws.com
+```
+
+### 5. Build local images
+
+```powershell
+docker build -t csas-backend:v1 .\backend
+docker build -t csas-frontend:v1 .\frontend
+docker build -t csas-python:v1 .\python
+```
+
+### 6. Tag images for ECR
+
+```powershell
+docker tag csas-backend:v1 533267330483.dkr.ecr.ap-northeast-2.amazonaws.com/csas-backend:v1
+docker tag csas-frontend:v1 533267330483.dkr.ecr.ap-northeast-2.amazonaws.com/csas-frontend:v1
+docker tag csas-python:v1 533267330483.dkr.ecr.ap-northeast-2.amazonaws.com/csas-python:v1
+```
+
+### 7. Push images
+
+```powershell
+docker push 533267330483.dkr.ecr.ap-northeast-2.amazonaws.com/csas-backend:v1
+docker push 533267330483.dkr.ecr.ap-northeast-2.amazonaws.com/csas-frontend:v1
+docker push 533267330483.dkr.ecr.ap-northeast-2.amazonaws.com/csas-python:v1
+```
+
+### 8. Create runtime secret
+
+Create the backend runtime secret before applying manifests. Do not commit real secrets.
+
+```powershell
+kubectl create secret generic backend-secrets `
+  --from-literal=S3_BUCKET_NAME=replace-me `
+  --from-literal=OPENSEARCH_ENDPOINT=replace-me `
+  --from-literal=OPENSEARCH_REGION=ap-northeast-2
+```
+
+If the secret already exists, update it with the real values or delete and recreate it.
+
+### 9. Deploy to EKS
+
+```powershell
+kubectl apply -f k8s/
+kubectl rollout status deployment/backend
+kubectl rollout status deployment/frontend
+kubectl rollout status deployment/python
+```
+
+### GitHub Actions
+
+The workflow in `.github/workflows/deploy-eks.yml` uses Git SHA image tags, creates missing ECR repositories if needed, pushes images to `csas-backend`, `csas-frontend`, and `csas-python`, then updates the EKS deployments with `kubectl set image`.
+
+Required GitHub Secrets:
+
+- `AWS_ACCESS_KEY_ID`
+- `AWS_SECRET_ACCESS_KEY`
