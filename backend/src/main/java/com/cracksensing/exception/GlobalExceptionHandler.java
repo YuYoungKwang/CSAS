@@ -12,16 +12,21 @@ import com.cracksensing.dto.ErrorResponse;
 
 import java.time.Instant;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import jakarta.servlet.http.HttpServletRequest;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(InvalidImageFileException.class)
     public ResponseEntity<ErrorResponse> handleInvalidImageFile(
             InvalidImageFileException exception,
             HttpServletRequest request
     ) {
+        log.warn("Invalid image upload request. path={}, message={}", request.getRequestURI(), exception.getMessage());
         return buildErrorResponse(HttpStatus.BAD_REQUEST, exception.getMessage(), request);
     }
 
@@ -30,6 +35,7 @@ public class GlobalExceptionHandler {
             S3UploadException exception,
             HttpServletRequest request
     ) {
+        log.error("S3 upload failed. path={}, message={}", request.getRequestURI(), exception.getMessage(), exception);
         return buildErrorResponse(
                 HttpStatus.INTERNAL_SERVER_ERROR,
                 "Image upload failed while saving the file to S3.",
@@ -42,6 +48,7 @@ public class GlobalExceptionHandler {
             MaxUploadSizeExceededException exception,
             HttpServletRequest request
     ) {
+        log.warn("Multipart upload rejected because file size exceeded limit. path={}, message={}", request.getRequestURI(), exception.getMessage());
         return buildErrorResponse(HttpStatus.PAYLOAD_TOO_LARGE, exception.getMessage(), request);
     }
 
@@ -50,6 +57,7 @@ public class GlobalExceptionHandler {
             MissingServletRequestPartException exception,
             HttpServletRequest request
     ) {
+        log.warn("Multipart upload rejected because file part is missing. path={}, message={}", request.getRequestURI(), exception.getMessage());
         return buildErrorResponse(
                 HttpStatus.BAD_REQUEST,
                 "Request must include a file part named 'file'.",
@@ -62,6 +70,7 @@ public class GlobalExceptionHandler {
             MultipartException exception,
             HttpServletRequest request
     ) {
+        log.warn("Multipart upload rejected because request format is invalid. path={}, message={}", request.getRequestURI(), exception.getMessage());
         return buildErrorResponse(
                 HttpStatus.BAD_REQUEST,
                 "Request must be sent as multipart/form-data.",

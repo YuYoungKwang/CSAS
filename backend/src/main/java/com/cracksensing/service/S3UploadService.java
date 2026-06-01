@@ -14,6 +14,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.cracksensing.dto.AnalysisRecord;
 import com.cracksensing.exception.InvalidImageFileException;
@@ -27,6 +29,7 @@ import software.amazon.awssdk.services.s3.model.S3Exception;
 @Service
 public class S3UploadService {
 
+    private static final Logger log = LoggerFactory.getLogger(S3UploadService.class);
     private static final Set<String> ALLOWED_EXTENSIONS = Set.of("jpg", "jpeg", "png");
     private static final Map<String, String> ALLOWED_CONTENT_TYPES_BY_EXTENSION = Map.of(
             "jpg", "image/jpeg",
@@ -70,6 +73,15 @@ public class S3UploadService {
         try {
             s3Client.putObject(putObjectRequest, RequestBody.fromInputStream(file.getInputStream(), file.getSize()));
         } catch (S3Exception | IOException exception) {
+            log.error(
+                    "Image upload failed while saving to S3. originalFileName={}, contentType={}, size={}, bucket={}, objectKey={}",
+                    originalFileName,
+                    file.getContentType(),
+                    file.getSize(),
+                    bucketName,
+                    objectKey,
+                    exception
+            );
             throw new S3UploadException("Failed to upload image to S3.", exception);
         }
 
@@ -86,17 +98,31 @@ public class S3UploadService {
 
     private void validateFile(MultipartFile file) {
         if (file == null || file.isEmpty()) {
+            log.warn("Image upload rejected: file is missing or empty.");
             throw new InvalidImageFileException("Image file is required.");
         }
 
         String extension = getExtension(file.getOriginalFilename());
         if (!ALLOWED_EXTENSIONS.contains(extension)) {
+            log.warn(
+                    "Image upload rejected: unsupported file extension. originalFileName={}, extension={}, allowedExtensions={}",
+                    file.getOriginalFilename(),
+                    extension,
+                    ALLOWED_EXTENSIONS
+            );
             throw new InvalidImageFileException("Only jpg, jpeg, and png images are allowed.");
         }
 
         String contentType = file.getContentType();
         String allowedContentType = ALLOWED_CONTENT_TYPES_BY_EXTENSION.get(extension);
         if (!StringUtils.hasText(contentType) || !allowedContentType.equalsIgnoreCase(contentType)) {
+            log.warn(
+                    "Image upload rejected: extension and content type do not match. originalFileName={}, extension={}, contentType={}, expectedContentType={}",
+                    file.getOriginalFilename(),
+                    extension,
+                    contentType,
+                    allowedContentType
+            );
             throw new InvalidImageFileException("File extension and content type do not match.");
         }
     }
