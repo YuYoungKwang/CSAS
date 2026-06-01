@@ -45,6 +45,20 @@ curl -X POST "http://localhost:8080/api/images/upload" \
 - `imageId`: S3 `objectKey`
 - `objectUrl`: S3 객체 URL
 
+classifier 서버 응답 예시:
+
+```json
+{
+  "imageId": "images/2026/06/01/uuid.jpg",
+  "cracked": 1,
+  "crackType": 7,
+  "crackPos": [
+    [14, 10],
+    [31, 85]
+  ]
+}
+```
+
 기본 요청 경로는 다음과 같습니다.
 
 - `POST http://localhost:8000/api/classify`

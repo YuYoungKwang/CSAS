@@ -6,6 +6,7 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
 import com.cracksensing.dto.ClassifierRequest;
+import com.cracksensing.dto.ClassifierResponse;
 import com.cracksensing.exception.ClassifierDispatchException;
 
 @Service
@@ -19,12 +20,12 @@ public class ClassifierClient {
         this.classifierBaseUrl = classifierBaseUrl;
     }
 
-    public void sendToClassifier(String imageId, String objectUrl) {
+    public ClassifierResponse sendToClassifier(String imageId, String objectUrl) {
         ClassifierRequest request = new ClassifierRequest(imageId, objectUrl);
         String url = classifierBaseUrl + "/api/classify";
 
         try {
-            restTemplate.postForEntity(url, request, Void.class);
+            return restTemplate.postForObject(url, request, ClassifierResponse.class);
         } catch (RestClientException exception) {
             throw new ClassifierDispatchException("Failed to send image to classifier server.", exception);
         }

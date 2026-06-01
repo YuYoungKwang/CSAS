@@ -10,6 +10,13 @@ class ClassifierRequest(BaseModel):
     objectUrl: HttpUrl
 
 
+class ClassifierResponse(BaseModel):
+    imageId: str
+    cracked: int
+    crackType: int
+    crackPos: list[list[int]]
+
+
 @app.get("/health")
 def health():
     return {"status": "UP"}
@@ -17,8 +24,9 @@ def health():
 
 @app.post("/api/classify")
 def classify(payload: ClassifierRequest):
-    return {
-        "imageId": payload.imageId,
-        "status": "received",
-        "message": "Classification request received.",
-    }
+    return ClassifierResponse(
+        imageId=payload.imageId,
+        cracked=1,
+        crackType=7,
+        crackPos=[[14, 10], [31, 85]],
+    )
