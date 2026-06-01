@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.MultipartException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 
 import com.cracksensing.dto.ErrorResponse;
 
@@ -30,7 +31,35 @@ public class GlobalExceptionHandler {
             S3UploadException exception,
             HttpServletRequest request
     ) {
-        return buildErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR, exception.getMessage(), request);
+        return buildErrorResponse(
+                HttpStatus.INTERNAL_SERVER_ERROR,
+                "Image upload failed while saving the file to S3.",
+                request
+        );
+    }
+
+    @ExceptionHandler(OpenSearchStorageException.class)
+    public ResponseEntity<ErrorResponse> handleOpenSearchStorageFailure(
+            OpenSearchStorageException exception,
+            HttpServletRequest request
+    ) {
+        return buildErrorResponse(
+                HttpStatus.BAD_GATEWAY,
+                "Image was analyzed, but saving the analysis record to OpenSearch failed.",
+                request
+        );
+    }
+
+    @ExceptionHandler(ClassifierDispatchException.class)
+    public ResponseEntity<ErrorResponse> handleClassifierDispatchFailure(
+            ClassifierDispatchException exception,
+            HttpServletRequest request
+    ) {
+        return buildErrorResponse(
+                HttpStatus.BAD_GATEWAY,
+                "Image was saved to S3, but sending it to the classifier server failed.",
+                request
+        );
     }
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)
@@ -41,12 +70,28 @@ public class GlobalExceptionHandler {
         return buildErrorResponse(HttpStatus.PAYLOAD_TOO_LARGE, exception.getMessage(), request);
     }
 
-    @ExceptionHandler(MissingServletRequestParameterException.class)
+    @ExceptionHandler(MissingServletRequestPartException.class)
     public ResponseEntity<ErrorResponse> handleMissingParameter(
+            MissingServletRequestPartException exception,
+            HttpServletRequest request
+    ) {
+        return buildErrorResponse(
+                HttpStatus.BAD_REQUEST,
+                "Request must include a file part named 'file'.",
+                request
+        );
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ErrorResponse> handleMissingRequestParameter(
             MissingServletRequestParameterException exception,
             HttpServletRequest request
     ) {
-        return buildErrorResponse(HttpStatus.BAD_REQUEST, exception.getMessage(), request);
+        return buildErrorResponse(
+                HttpStatus.BAD_REQUEST,
+                "Request must include a userId parameter.",
+                request
+        );
     }
 
     @ExceptionHandler(MultipartException.class)
@@ -54,7 +99,11 @@ public class GlobalExceptionHandler {
             MultipartException exception,
             HttpServletRequest request
     ) {
-        return buildErrorResponse(HttpStatus.BAD_REQUEST, "Request must be multipart/form-data with a file field.", request);
+        return buildErrorResponse(
+                HttpStatus.BAD_REQUEST,
+                "Request must be sent as multipart/form-data.",
+                request
+        );
     }
 
     private ResponseEntity<ErrorResponse> buildErrorResponse(

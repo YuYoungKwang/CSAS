@@ -1,12 +1,25 @@
 spring:
   application:
     name: crack-sensing-ai-service
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 12MB
 
 aws:
   region: ${AWS_REGION:ap-northeast-2}
 
 s3:
   bucket-name: ${S3_BUCKET_NAME}
+
+classifier:
+  base-url: ${CLASSIFIER_BASE_URL:http://localhost:8000}
+
+opensearch:
+  endpoint: ${OPENSEARCH_ENDPOINT:}
+  region: ${OPENSEARCH_REGION:ap-northeast-2}
+  service: ${OPENSEARCH_SERVICE:es}
+  index-name: ${OPENSEARCH_INDEX_NAME:crack-analysis-results}
 
 server:
   port: 8080
