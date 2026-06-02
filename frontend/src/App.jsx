@@ -41,6 +41,11 @@ const text = {
   confidence: '\uC2E0\uB8B0\uB3C4',
   ratio: '\uACB0\uD568 \uBA74\uC801\uBE44',
   albumTitle: '\uBD84\uC11D \uC568\uBC94',
+  albumDetailTitle: '\uC0C1\uC138 \uC815\uBCF4',
+  albumLoading: '\uC568\uBC94 \uB85C\uB529 \uC911',
+  albumLoadFailed: '\uC568\uBC94 \uB85C\uB529\uc5d0 \uC2E4\ud328\ud588\uc2b5\ub2c8\ub2e4.',
+  annotationCount: '\uC8FC\uC11D \uAC1C\uC218',
+  aiStatus: 'AI \uC0C1\uD0DC',
   search: '\uAC80\uC0C9',
   searchPlaceholder: '\uC704\uCE58, \uACB0\uD568 \uC720\uD615, \uBA54\uBAA8 \uAC80\uC0C9',
   all: '\uC804\uCCB4',
@@ -96,6 +101,56 @@ const seedAlbum = [
   },
 ];
 
+function formatDate(value) {
+  if (!value) {
+    return '-';
+  }
+
+  return new Date(value).toLocaleString('ko-KR');
+}
+
+function getDefectSeverity(aiAnalysis) {
+  const defectFound = aiAnalysis?.defect_found ?? aiAnalysis?.defectFound ?? false;
+  return defectFound ? 'danger' : 'safe';
+}
+
+function getDefectLabel(aiAnalysis) {
+  const defectFound = aiAnalysis?.defect_found ?? aiAnalysis?.defectFound ?? false;
+  if (!defectFound) {
+    return text.safe;
+  }
+
+  const annotations = aiAnalysis?.annotations ?? [];
+  const firstAnnotation = annotations[0];
+  return firstAnnotation?.class_name ?? firstAnnotation?.className ?? text.danger;
+}
+
+function normalizeAlbumRecord(record) {
+  const severity = getDefectSeverity(record.aiAnalysis);
+  const severityLabel = severity === 'safe' ? text.safe : text.danger;
+  const annotations = record.aiAnalysis?.annotations ?? [];
+  const firstAnnotation = annotations[0];
+
+  return {
+    id: record.objectKey,
+    objectKey: record.objectKey,
+    objectUrl: record.objectUrl,
+    savedAt: record.savedAt,
+    originalFileName: record.originalFileName,
+    fileSize: record.fileSize,
+    userId: record.userId,
+    aiAnalysis: record.aiAnalysis,
+    severity,
+    severityLabel,
+    defectType: getDefectLabel(record.aiAnalysis),
+    confidence: null,
+    ratio: null,
+    note: record.originalFileName,
+    annotationCount: annotations.length,
+    firstAnnotation,
+  };
+}
+
 function App() {
   const backendBaseUrl = import.meta.env.VITE_BACKEND_BASE_URL ?? 'http://localhost:8080';
   const demoUserId = 'demo-user-001';
@@ -110,6 +165,9 @@ function App() {
   const [analysis, setAnalysis] = useState(null);
   const [errorMessage, setErrorMessage] = useState('');
   const [albumItems, setAlbumItems] = useState(seedAlbum);
+  const [albumLoading, setAlbumLoading] = useState(false);
+  const [albumLoadError, setAlbumLoadError] = useState('');
+  const [selectedAlbum, setSelectedAlbum] = useState(null);
   const [activeFilter, setActiveFilter] = useState('all');
   const [query, setQuery] = useState('');
 
@@ -131,6 +189,47 @@ function App() {
     return () => URL.revokeObjectURL(objectUrl);
   }, [selectedFile]);
 
+  useEffect(() => {
+    if (view !== 'album') {
+      return undefined;
+    }
+
+    let isActive = true;
+
+    const loadAlbumItems = async () => {
+      setAlbumLoading(true);
+      setAlbumLoadError('');
+
+      try {
+        const response = await api.get('/api/albums', {
+          params: { userId: demoUserId, limit: 20 },
+        });
+        const nextItems = Array.isArray(response.data) ? response.data.map(normalizeAlbumRecord) : [];
+
+        if (isActive) {
+          setAlbumItems(nextItems);
+          setSelectedAlbum(nextItems[0] ?? null);
+        }
+      } catch {
+        if (isActive) {
+          setAlbumLoadError(text.albumLoadFailed);
+          setAlbumItems([]);
+          setSelectedAlbum(null);
+        }
+      } finally {
+        if (isActive) {
+          setAlbumLoading(false);
+        }
+      }
+    };
+
+    loadAlbumItems();
+
+    return () => {
+      isActive = false;
+    };
+  }, [api, demoUserId, view]);
+
   const filteredAlbum = albumItems.filter((item) => {
     const matchesFilter = activeFilter === 'all' || item.severity === activeFilter;
     const lowerQuery = query.trim().toLowerCase();
@@ -140,6 +239,33 @@ function App() {
 
     return matchesFilter && matchesQuery;
   });
+
+  const cameraAnalysis = analysis?.aiAnalysis ?? null;
+  const cameraSeverity = getDefectSeverity(cameraAnalysis);
+  const cameraSeverityLabel = cameraSeverity === 'safe' ? text.safe : text.danger;
+  const cameraDefectType = getDefectLabel(cameraAnalysis);
+  const cameraAnnotationCount = cameraAnalysis?.annotations?.length ?? 0;
+
+  const handleSelectAlbum = async (item) => {
+    setSelectedAlbum(item);
+
+    if (!item?.objectKey) {
+      return;
+    }
+
+    try {
+      const response = await api.get('/api/albums/detail', {
+        params: { objectKey: item.objectKey },
+      });
+      const detail = response.data ? normalizeAlbumRecord(response.data) : null;
+
+      if (detail) {
+        setSelectedAlbum(detail);
+      }
+    } catch {
+      setAlbumLoadError(text.albumLoadFailed);
+    }
+  };
 
   const handleFileChange = (event) => {
     const file = event.target.files?.[0];
@@ -169,27 +295,12 @@ function App() {
     setErrorMessage('');
 
     try {
-      const response = await api.post('/api/images/upload', formData);
-      const mockAnalysis = {
-        defectType: 'Crack',
-        severity: 'alert',
-        severityLabel: text.alert,
-        confidence: 0.91,
-        ratio: 0.31,
-        objectKey: response.data?.objectKey ?? '-',
-      };
+    const response = await api.post('/api/images/upload', formData);
+      const uploadedRecord = response.data ? normalizeAlbumRecord(response.data) : null;
 
-      setAnalysis(mockAnalysis);
-      setAlbumItems((items) => [
-        {
-          id: Date.now(),
-          location: '\uC0C8 \uCD2C\uC601',
-          capturedAt: new Date().toLocaleString('ko-KR'),
-          note: selectedFile.name,
-          ...mockAnalysis,
-        },
-        ...items,
-      ]);
+      setAnalysis(uploadedRecord);
+      setAlbumItems((items) => (uploadedRecord ? [uploadedRecord, ...items] : items));
+      setSelectedAlbum(uploadedRecord);
       setUploadState('done');
     } catch {
       setUploadState('error');
@@ -375,19 +486,19 @@ function App() {
           {errorMessage && <p className="message error">{errorMessage}</p>}
 
           <section className="result-card">
-            <div className={`severity-pill ${analysis?.severity ?? 'idle'}`}>{analysis?.severityLabel ?? text.waiting}</div>
+            <div className={`severity-pill ${cameraSeverity}`}>{cameraSeverityLabel ?? text.waiting}</div>
             <dl>
               <div>
                 <dt>{text.defectType}</dt>
-                <dd>{analysis?.defectType ?? '-'}</dd>
+                <dd>{cameraDefectType ?? '-'}</dd>
               </div>
               <div>
-                <dt>{text.confidence}</dt>
-                <dd>{formatPercent(analysis?.confidence)}</dd>
+                <dt>{text.annotationCount}</dt>
+                <dd>{cameraAnnotationCount}</dd>
               </div>
               <div>
-                <dt>{text.ratio}</dt>
-                <dd>{formatPercent(analysis?.ratio)}</dd>
+                <dt>{text.aiStatus}</dt>
+                <dd>{cameraAnalysis?.status ?? '-'}</dd>
               </div>
             </dl>
           </section>
@@ -427,17 +538,32 @@ function App() {
             ))}
           </div>
 
+          {albumLoading && <p className="screen-copy">{text.albumLoading}</p>}
+          {albumLoadError && <p className="message error">{albumLoadError}</p>}
+
           <div className="album-list">
             {filteredAlbum.length > 0 ? (
               filteredAlbum.map((item) => (
-                <article className="album-item" key={item.id}>
-                  <div className={`album-icon ${item.severity}`}>
-                    <Images size={28} />
+                <article
+                  className={`album-item ${selectedAlbum?.objectKey === item.objectKey ? 'active' : ''}`}
+                  key={item.objectKey}
+                  onClick={() => handleSelectAlbum(item)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      handleSelectAlbum(item);
+                    }
+                  }}
+                >
+                  <div className="album-thumb">
+                    {item.objectUrl ? <img alt={item.originalFileName} src={item.objectUrl} /> : <Images size={28} />}
                   </div>
                   <div>
-                    <strong>{item.location}</strong>
-                    <span>{item.capturedAt}</span>
-                    <p>{item.note}</p>
+                    <strong>{item.originalFileName}</strong>
+                    <span>{item.savedAt ? new Date(item.savedAt).toLocaleString('ko-KR') : '-'}</span>
+                    <p>{item.defectType}</p>
                   </div>
                   <em>{item.severityLabel}</em>
                 </article>
@@ -446,6 +572,41 @@ function App() {
               <p className="empty-state">{text.emptyAlbum}</p>
             )}
           </div>
+
+          {selectedAlbum && (
+            <section className="result-card">
+              <div className={`severity-pill ${selectedAlbum.severity ?? 'idle'}`}>{selectedAlbum.severityLabel}</div>
+              <h3>{text.albumDetailTitle}</h3>
+              <div className="preview-frame album-preview">
+                {selectedAlbum.objectUrl ? <img alt={selectedAlbum.originalFileName} src={selectedAlbum.objectUrl} /> : <span>{text.noImage}</span>}
+              </div>
+              <dl>
+                <div>
+                  <dt>{text.defectType}</dt>
+                  <dd>{selectedAlbum.defectType ?? '-'}</dd>
+                </div>
+                <div>
+                  <dt>{text.annotationCount}</dt>
+                  <dd>{selectedAlbum.annotationCount ?? 0}</dd>
+                </div>
+                <div>
+                  <dt>{text.server}</dt>
+                  <dd>{selectedAlbum.userId ?? '-'}</dd>
+                </div>
+              </dl>
+              {selectedAlbum.aiAnalysis && (
+                <div className="analysis-summary">
+                  <p>
+                    <strong>{text.aiStatus}:</strong> {selectedAlbum.aiAnalysis.status ?? '-'}
+                  </p>
+                  <p>
+                    <strong>Defect:</strong> {String(selectedAlbum.aiAnalysis.defect_found ?? selectedAlbum.aiAnalysis.defectFound ?? false)}
+                  </p>
+                  <pre>{JSON.stringify(selectedAlbum.aiAnalysis.annotations ?? [], null, 2)}</pre>
+                </div>
+              )}
+            </section>
+          )}
         </section>
       )}
     </main>
