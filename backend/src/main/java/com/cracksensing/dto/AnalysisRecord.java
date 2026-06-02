@@ -8,6 +8,7 @@ public record AnalysisRecord(
         String objectUrl,
         String originalFileName,
         long fileSize,
+        String userId,
         AiAnalysisResponse aiAnalysis
 ) {
 }

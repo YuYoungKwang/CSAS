@@ -61,6 +61,10 @@ public class S3UploadService {
     }
 
     public AnalysisRecord uploadImage(MultipartFile file) {
+        return uploadImage(file, "demo-user-001");
+    }
+
+    public AnalysisRecord uploadImage(MultipartFile file, String userId) {
         validateFile(file);
 
         String originalFileName = file.getOriginalFilename();
@@ -97,6 +101,7 @@ public class S3UploadService {
                 objectUrl,
                 originalFileName,
                 file.getSize(),
+                userId,
                 aiAnalysis
         );
         return openSearchStorageService.save(analysisRecord);

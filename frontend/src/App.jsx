@@ -98,6 +98,7 @@ const seedAlbum = [
 
 function App() {
   const backendBaseUrl = import.meta.env.VITE_BACKEND_BASE_URL ?? 'http://localhost:8080';
+  const demoUserId = 'demo-user-001';
   const api = useMemo(() => axios.create({ baseURL: backendBaseUrl }), [backendBaseUrl]);
 
   const [view, setView] = useState('home');
@@ -163,6 +164,7 @@ function App() {
 
     const formData = new FormData();
     formData.append('file', selectedFile);
+    formData.append('userId', demoUserId);
     setUploadState('uploading');
     setErrorMessage('');
 
