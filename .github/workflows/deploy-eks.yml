@@ -48,7 +48,7 @@ jobs:
 
       - name: Build and push frontend image
         run: |
-          docker build -t $ECR_REGISTRY/csas-frontend:$IMAGE_TAG ./frontend
+          docker build --build-arg VITE_GOOGLE_CLIENT_ID="${{ secrets.GOOGLE_CLIENT_ID }}" -t $ECR_REGISTRY/csas-frontend:$IMAGE_TAG ./frontend
           docker push $ECR_REGISTRY/csas-frontend:$IMAGE_TAG
 
       - name: Build and push python image
@@ -58,6 +58,20 @@ jobs:
 
       - name: Update kubeconfig
         run: aws eks update-kubeconfig --region $AWS_REGION --name $EKS_CLUSTER_NAME
+
+      - name: Apply runtime secrets
+        run: |
+          kubectl create secret generic backend-secrets \
+            --from-literal=S3_BUCKET_NAME="${{ secrets.S3_BUCKET_NAME }}" \
+            --from-literal=OPENSEARCH_ENDPOINT="${{ secrets.OPENSEARCH_ENDPOINT }}" \
+            --from-literal=OPENSEARCH_REGION="${{ secrets.OPENSEARCH_REGION }}" \
+            --from-literal=GOOGLE_CLIENT_ID="${{ secrets.GOOGLE_CLIENT_ID }}" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+          kubectl create secret generic opensearch-master-secrets \
+            --from-literal=OPENSEARCH_MASTER_USERNAME="${{ secrets.OPENSEARCH_MASTER_USERNAME }}" \
+            --from-literal=OPENSEARCH_MASTER_PASSWORD="${{ secrets.OPENSEARCH_MASTER_PASSWORD }}" \
+            --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Apply Kubernetes manifests
         run: kubectl apply -f k8s/

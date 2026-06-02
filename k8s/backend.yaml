@@ -44,6 +44,11 @@ spec:
                 secretKeyRef:
                   name: backend-secrets
                   key: OPENSEARCH_REGION
+            - name: GOOGLE_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: backend-secrets
+                  key: GOOGLE_CLIENT_ID
           readinessProbe:
             httpGet:
               path: /health
