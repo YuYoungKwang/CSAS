@@ -2,7 +2,11 @@ package com.cracksensing.service;
 
 import java.util.List;
 
+import com.cracksensing.dto.AlbumDetailResponse;
+import com.cracksensing.dto.AlbumSummaryResponse;
 import com.cracksensing.dto.AnalysisRecord;
+import com.cracksensing.dto.AiAnalysisResponse;
+import com.cracksensing.dto.AiAnnotation;
 
 import org.opensearch.client.opensearch.OpenSearchClient;
 import org.opensearch.client.opensearch.core.GetResponse;
@@ -30,7 +34,7 @@ public class AlbumQueryService {
         this.indexName = indexName;
     }
 
-    public AnalysisRecord findByObjectKey(String objectKey) {
+    public AlbumDetailResponse findByObjectKey(String objectKey) {
         if (openSearchClient == null) {
             log.warn("OpenSearch is not configured. Album detail lookup is unavailable. objectKey={}", objectKey);
             return null;
@@ -42,14 +46,14 @@ public class AlbumQueryService {
                     AnalysisRecord.class
             );
 
-            return response.found() ? response.source() : null;
+            return response.found() && response.source() != null ? toDetailResponse(response.source()) : null;
         } catch (Exception exception) {
             log.error("Failed to fetch album detail from OpenSearch. objectKey={}, indexName={}", objectKey, indexName, exception);
             return null;
         }
     }
 
-    public List<AnalysisRecord> findByUserId(String userId, int limit) {
+    public List<AlbumSummaryResponse> findByUserId(String userId, int limit) {
         if (openSearchClient == null) {
             log.warn("OpenSearch is not configured. Album list lookup is unavailable. userId={}", userId);
             return List.of();
@@ -71,10 +75,66 @@ public class AlbumQueryService {
             ).hits().hits().stream()
                     .map(hit -> hit.source())
                     .filter(record -> record != null)
+                    .map(this::toSummaryResponse)
                     .toList();
         } catch (Exception exception) {
             log.error("Failed to fetch album list from OpenSearch. userId={}, indexName={}", userId, indexName, exception);
             return List.of();
         }
+    }
+
+    private AlbumSummaryResponse toSummaryResponse(AnalysisRecord record) {
+        AiAnalysisResponse aiAnalysis = record.aiAnalysis();
+        boolean defectFound = getDefectFound(aiAnalysis);
+        String defectType = getDefectType(aiAnalysis);
+        int annotationCount = getAnnotationCount(aiAnalysis);
+
+        return new AlbumSummaryResponse(
+                record.objectKey(),
+                record.savedAt(),
+                record.objectUrl(),
+                record.originalFileName(),
+                record.userId(),
+                defectFound,
+                defectType,
+                annotationCount
+        );
+    }
+
+    private AlbumDetailResponse toDetailResponse(AnalysisRecord record) {
+        AiAnalysisResponse aiAnalysis = record.aiAnalysis();
+        boolean defectFound = getDefectFound(aiAnalysis);
+        String defectType = getDefectType(aiAnalysis);
+        int annotationCount = getAnnotationCount(aiAnalysis);
+
+        return new AlbumDetailResponse(
+                record.objectKey(),
+                record.savedAt(),
+                record.objectUrl(),
+                record.originalFileName(),
+                record.fileSize(),
+                record.userId(),
+                aiAnalysis,
+                defectFound,
+                defectType,
+                annotationCount
+        );
+    }
+
+    private boolean getDefectFound(AiAnalysisResponse aiAnalysis) {
+        return aiAnalysis != null && Boolean.TRUE.equals(aiAnalysis.defectFound());
+    }
+
+    private String getDefectType(AiAnalysisResponse aiAnalysis) {
+        if (aiAnalysis == null || aiAnalysis.annotations() == null || aiAnalysis.annotations().isEmpty()) {
+            return "SAFE";
+        }
+
+        AiAnnotation firstAnnotation = aiAnalysis.annotations().get(0);
+        return firstAnnotation != null && firstAnnotation.className() != null ? firstAnnotation.className() : "SAFE";
+    }
+
+    private int getAnnotationCount(AiAnalysisResponse aiAnalysis) {
+        return aiAnalysis == null || aiAnalysis.annotations() == null ? 0 : aiAnalysis.annotations().size();
     }
 }

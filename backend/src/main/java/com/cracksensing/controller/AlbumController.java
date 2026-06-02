@@ -11,7 +11,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.cracksensing.dto.AnalysisRecord;
+import com.cracksensing.dto.AlbumDetailResponse;
+import com.cracksensing.dto.AlbumSummaryResponse;
 import com.cracksensing.service.AlbumQueryService;
 
 @RestController
@@ -27,8 +28,8 @@ public class AlbumController {
 
     @GetMapping("/detail")
     @ResponseStatus(HttpStatus.OK)
-    public AnalysisRecord getAlbumDetail(@RequestParam String objectKey) {
-        AnalysisRecord detail = albumQueryService.findByObjectKey(objectKey);
+    public AlbumDetailResponse getAlbumDetail(@RequestParam String objectKey) {
+        AlbumDetailResponse detail = albumQueryService.findByObjectKey(objectKey);
         if (detail == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Album detail not found.");
         }
@@ -38,7 +39,7 @@ public class AlbumController {
 
     @GetMapping
     @ResponseStatus(HttpStatus.OK)
-    public List<AnalysisRecord> getAlbumList(
+    public List<AlbumSummaryResponse> getAlbumList(
             @RequestParam(defaultValue = "demo-user-001") String userId,
             @RequestParam(defaultValue = "20") int limit
     ) {
