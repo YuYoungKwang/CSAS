@@ -33,7 +33,7 @@ jobs:
         uses: aws-actions/amazon-ecr-login@v2
 
       - name: Set image tag
-        run: echo "IMAGE_TAG=${GITHUB_SHA::7}" >> "$GITHUB_ENV"
+        run: echo "IMAGE_TAG=${GITHUB_SHA::7}-${GITHUB_RUN_NUMBER}-${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_ENV"
 
       - name: Ensure ECR repositories
         run: |
@@ -59,18 +59,41 @@ jobs:
       - name: Update kubeconfig
         run: aws eks update-kubeconfig --region $AWS_REGION --name $EKS_CLUSTER_NAME
 
+      - name: Validate required secrets
+        env:
+          S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME }}
+          OPENSEARCH_ENDPOINT: ${{ secrets.OPENSEARCH_ENDPOINT }}
+          OPENSEARCH_REGION: ${{ secrets.OPENSEARCH_REGION }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          OPENSEARCH_MASTER_USERNAME: ${{ secrets.OPENSEARCH_MASTER_USERNAME }}
+          OPENSEARCH_MASTER_PASSWORD: ${{ secrets.OPENSEARCH_MASTER_PASSWORD }}
+        run: |
+          test -n "$S3_BUCKET_NAME"
+          test -n "$OPENSEARCH_ENDPOINT"
+          test -n "$OPENSEARCH_REGION"
+          test -n "$GOOGLE_CLIENT_ID"
+          test -n "$OPENSEARCH_MASTER_USERNAME"
+          test -n "$OPENSEARCH_MASTER_PASSWORD"
+
       - name: Apply runtime secrets
+        env:
+          S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME }}
+          OPENSEARCH_ENDPOINT: ${{ secrets.OPENSEARCH_ENDPOINT }}
+          OPENSEARCH_REGION: ${{ secrets.OPENSEARCH_REGION }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          OPENSEARCH_MASTER_USERNAME: ${{ secrets.OPENSEARCH_MASTER_USERNAME }}
+          OPENSEARCH_MASTER_PASSWORD: ${{ secrets.OPENSEARCH_MASTER_PASSWORD }}
         run: |
           kubectl create secret generic backend-secrets \
-            --from-literal=S3_BUCKET_NAME="${{ secrets.S3_BUCKET_NAME }}" \
-            --from-literal=OPENSEARCH_ENDPOINT="${{ secrets.OPENSEARCH_ENDPOINT }}" \
-            --from-literal=OPENSEARCH_REGION="${{ secrets.OPENSEARCH_REGION }}" \
-            --from-literal=GOOGLE_CLIENT_ID="${{ secrets.GOOGLE_CLIENT_ID }}" \
+            --from-literal=S3_BUCKET_NAME="$S3_BUCKET_NAME" \
+            --from-literal=OPENSEARCH_ENDPOINT="$OPENSEARCH_ENDPOINT" \
+            --from-literal=OPENSEARCH_REGION="$OPENSEARCH_REGION" \
+            --from-literal=GOOGLE_CLIENT_ID="$GOOGLE_CLIENT_ID" \
             --dry-run=client -o yaml | kubectl apply -f -
 
           kubectl create secret generic opensearch-master-secrets \
-            --from-literal=OPENSEARCH_MASTER_USERNAME="${{ secrets.OPENSEARCH_MASTER_USERNAME }}" \
-            --from-literal=OPENSEARCH_MASTER_PASSWORD="${{ secrets.OPENSEARCH_MASTER_PASSWORD }}" \
+            --from-literal=OPENSEARCH_MASTER_USERNAME="$OPENSEARCH_MASTER_USERNAME" \
+            --from-literal=OPENSEARCH_MASTER_PASSWORD="$OPENSEARCH_MASTER_PASSWORD" \
             --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Apply Kubernetes manifests
