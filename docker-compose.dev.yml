@@ -7,6 +7,7 @@ services:
       - "5173:5173"
     environment:
       - VITE_BACKEND_BASE_URL=http://localhost:8080
+      - VITE_GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
     depends_on:
       - backend
 
@@ -25,6 +26,9 @@ services:
       - OPENSEARCH_REGION=${OPENSEARCH_REGION}
       - OPENSEARCH_SERVICE=${OPENSEARCH_SERVICE:-es}
       - OPENSEARCH_INDEX_NAME=${OPENSEARCH_INDEX_NAME:-crack-analysis-results}
+      - AI_BASE_URL=http://python:8000
+      - AI_ANALYZE_PATH=/api/analyze
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
 
   python:
     build:

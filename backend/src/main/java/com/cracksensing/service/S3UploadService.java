@@ -18,6 +18,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.cracksensing.dto.AnalysisRecord;
+import com.cracksensing.dto.AiAnalysisResponse;
 import com.cracksensing.exception.InvalidImageFileException;
 import com.cracksensing.exception.OpenSearchStorageException;
 import com.cracksensing.exception.S3UploadException;
@@ -41,23 +42,30 @@ public class S3UploadService {
     private static final ZoneId SEOUL_ZONE = ZoneId.of("Asia/Seoul");
 
     private final S3Client s3Client;
+    private final AiAnalysisClient aiAnalysisClient;
     private final OpenSearchStorageService openSearchStorageService;
     private final String bucketName;
     private final String awsRegion;
 
     public S3UploadService(
             S3Client s3Client,
+            AiAnalysisClient aiAnalysisClient,
             OpenSearchStorageService openSearchStorageService,
             @Value("${s3.bucket-name}") String bucketName,
             @Value("${aws.region}") String awsRegion
     ) {
         this.s3Client = s3Client;
+        this.aiAnalysisClient = aiAnalysisClient;
         this.openSearchStorageService = openSearchStorageService;
         this.bucketName = bucketName;
         this.awsRegion = awsRegion;
     }
 
     public AnalysisRecord uploadImage(MultipartFile file) {
+        return uploadImage(file, "demo-user-001");
+    }
+
+    public AnalysisRecord uploadImage(MultipartFile file, String userId) {
         validateFile(file);
 
         String originalFileName = file.getOriginalFilename();
@@ -87,12 +95,15 @@ public class S3UploadService {
         }
 
         String objectUrl = createObjectUrl(objectKey);
+        AiAnalysisResponse aiAnalysis = aiAnalysisClient.analyze(objectKey);
         AnalysisRecord analysisRecord = new AnalysisRecord(
                 objectKey,
                 Instant.now(),
                 objectUrl,
                 originalFileName,
-                file.getSize()
+                file.getSize(),
+                userId,
+                aiAnalysis
         );
         try {
             return openSearchStorageService.save(analysisRecord);
