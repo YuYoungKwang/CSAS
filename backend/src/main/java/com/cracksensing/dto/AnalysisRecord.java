@@ -7,6 +7,7 @@ public record AnalysisRecord(
         Instant savedAt,
         String objectUrl,
         String originalFileName,
-        long fileSize
+        long fileSize,
+        AiAnalysisResponse aiAnalysis
 ) {
 }

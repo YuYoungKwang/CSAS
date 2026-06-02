@@ -25,6 +25,8 @@ services:
       - OPENSEARCH_REGION=${OPENSEARCH_REGION}
       - OPENSEARCH_SERVICE=${OPENSEARCH_SERVICE:-es}
       - OPENSEARCH_INDEX_NAME=${OPENSEARCH_INDEX_NAME:-crack-analysis-results}
+      - AI_BASE_URL=http://python:8000
+      - AI_ANALYZE_PATH=/api/analyze
 
   python:
     build:
