@@ -1,5 +1,7 @@
 package com.cracksensing.controller;
 
+import java.util.List;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -32,5 +34,14 @@ public class AlbumController {
         }
 
         return detail;
+    }
+
+    @GetMapping
+    @ResponseStatus(HttpStatus.OK)
+    public List<AnalysisRecord> getAlbumList(
+            @RequestParam(defaultValue = "demo-user-001") String userId,
+            @RequestParam(defaultValue = "20") int limit
+    ) {
+        return albumQueryService.findByUserId(userId, limit);
     }
 }
