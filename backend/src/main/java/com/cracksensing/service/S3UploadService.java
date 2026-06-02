@@ -19,6 +19,7 @@ import org.slf4j.LoggerFactory;
 
 import com.cracksensing.dto.AnalysisRecord;
 import com.cracksensing.exception.InvalidImageFileException;
+import com.cracksensing.exception.OpenSearchStorageException;
 import com.cracksensing.exception.S3UploadException;
 
 import software.amazon.awssdk.core.sync.RequestBody;
@@ -93,7 +94,17 @@ public class S3UploadService {
                 originalFileName,
                 file.getSize()
         );
-        return openSearchStorageService.save(analysisRecord);
+        try {
+            return openSearchStorageService.save(analysisRecord);
+        } catch (OpenSearchStorageException exception) {
+            log.error(
+                    "Image uploaded to S3, but failed to save analysis record to OpenSearch. objectKey={}, objectUrl={}",
+                    objectKey,
+                    objectUrl,
+                    exception
+            );
+            return analysisRecord;
+        }
     }
 
     private void validateFile(MultipartFile file) {
