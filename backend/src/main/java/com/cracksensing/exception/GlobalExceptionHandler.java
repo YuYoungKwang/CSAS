@@ -78,6 +78,15 @@ public class GlobalExceptionHandler {
         );
     }
 
+    @ExceptionHandler(GoogleAuthenticationException.class)
+    public ResponseEntity<ErrorResponse> handleGoogleAuthenticationException(
+            GoogleAuthenticationException exception,
+            HttpServletRequest request
+    ) {
+        log.warn("Google authentication failed. path={}, message={}", request.getRequestURI(), exception.getMessage());
+        return buildErrorResponse(HttpStatus.UNAUTHORIZED, exception.getMessage(), request);
+    }
+
     private ResponseEntity<ErrorResponse> buildErrorResponse(
             HttpStatus status,
             String message,

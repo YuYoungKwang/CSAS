@@ -330,11 +330,62 @@ button {
 }
 
 .screen-copy,
-.login-form p {
+.login-form p,
+.login-screen > p {
   margin: 0;
   color: #4e5d3e;
   line-height: 1.6;
   font-weight: 900;
+}
+
+.google-login-box,
+.login-card {
+  display: grid;
+  gap: 16px;
+  border: 4px solid #20371d;
+  border-radius: 0;
+  padding: 18px;
+  background:
+    linear-gradient(90deg, rgba(123, 94, 63, 0.08) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(123, 94, 63, 0.08) 1px, transparent 1px),
+    #fff7d8;
+  background-size: 18px 18px;
+  box-shadow: 0 8px 0 #20371d;
+}
+
+.login-profile {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.login-profile img {
+  width: 64px;
+  height: 64px;
+  flex: 0 0 auto;
+  border: 3px solid #20371d;
+  border-radius: 0;
+  object-fit: cover;
+  background: #efe7bd;
+}
+
+.login-profile strong,
+.login-profile p,
+.login-profile span {
+  display: block;
+}
+
+.login-profile strong {
+  color: #20371d;
+  font-size: 1.02rem;
+}
+
+.login-profile p,
+.login-profile span {
+  margin: 2px 0 0;
+  color: #546146;
+  font-size: 0.88rem;
+  font-weight: 800;
 }
 
 .login-form,
