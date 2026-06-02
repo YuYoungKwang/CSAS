@@ -18,5 +18,12 @@ opensearch:
   service: ${OPENSEARCH_SERVICE:es}
   index-name: ${OPENSEARCH_INDEX_NAME:crack-analysis-results}
 
+ai:
+  base-url: ${AI_BASE_URL:}
+  analyze-path: ${AI_ANALYZE_PATH:/api/analyze}
+
+google:
+  client-id: ${GOOGLE_CLIENT_ID:}
+
 server:
   port: 8080
