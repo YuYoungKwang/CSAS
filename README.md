@@ -49,6 +49,11 @@ Target AWS resources:
   - `533267330483.dkr.ecr.ap-northeast-2.amazonaws.com/csas-backend:v1`
   - `533267330483.dkr.ecr.ap-northeast-2.amazonaws.com/csas-frontend:v1`
   - `533267330483.dkr.ecr.ap-northeast-2.amazonaws.com/csas-python:v1`
+- AI model bucket: `cracksensing-models-dev`
+- AI model path:
+  - `s3://cracksensing-models-dev/models/crack/v1/best.pt`
+  - `s3://cracksensing-models-dev/models/crack/v1/classes.json`
+  - `s3://cracksensing-models-dev/models/crack/v1/config.yaml`
 
 ### 1. Check AWS CLI identity
 
@@ -83,7 +88,38 @@ aws ecr create-repository `
 
 If `describe-repositories` succeeds, skip the matching `create-repository` command.
 
-### 3. Clean up mistaken local images
+### 3. Upload AI model files to S3
+
+The AI server image is pushed to ECR, but model artifacts should be uploaded to S3. The bucket should block public access, use server-side encryption, and keep versioning enabled.
+
+```powershell
+aws s3api create-bucket `
+  --bucket cracksensing-models-dev `
+  --region ap-northeast-2 `
+  --create-bucket-configuration LocationConstraint=ap-northeast-2
+
+aws s3api put-public-access-block `
+  --bucket cracksensing-models-dev `
+  --public-access-block-configuration BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
+
+aws s3api put-bucket-versioning `
+  --bucket cracksensing-models-dev `
+  --versioning-configuration Status=Enabled
+```
+
+Upload model artifacts after training:
+
+```powershell
+aws s3 cp .\best.pt s3://cracksensing-models-dev/models/crack/v1/best.pt --region ap-northeast-2
+aws s3 cp .\classes.json s3://cracksensing-models-dev/models/crack/v1/classes.json --region ap-northeast-2
+aws s3 cp .\config.yaml s3://cracksensing-models-dev/models/crack/v1/config.yaml --region ap-northeast-2
+
+aws s3 ls s3://cracksensing-models-dev/models/crack/v1/ --region ap-northeast-2
+```
+
+The Python deployment reads these paths from `MODEL_S3_URI`, `MODEL_CLASSES_S3_URI`, and `MODEL_CONFIG_S3_URI`.
+
+### 4. Clean up mistaken local images
 
 If the Python folder was accidentally built with the backend repository name, remove the wrong local tags before rebuilding.
 
@@ -95,14 +131,14 @@ docker image rm 533267330483.dkr.ecr.ap-northeast-2.amazonaws.com/csas-backend:l
 
 Ignore `No such image` errors. Do not try to overwrite `csas-backend:latest` in ECR.
 
-### 4. Login to ECR
+### 5. Login to ECR
 
 ```powershell
 aws ecr get-login-password --region ap-northeast-2 `
   | docker login --username AWS --password-stdin 533267330483.dkr.ecr.ap-northeast-2.amazonaws.com
 ```
 
-### 5. Build local images
+### 6. Build local images
 
 ```powershell
 docker build -t csas-backend:v1 .\backend
@@ -110,7 +146,7 @@ docker build -t csas-frontend:v1 .\frontend
 docker build -t csas-python:v1 .\python
 ```
 
-### 6. Tag images for ECR
+### 7. Tag images for ECR
 
 ```powershell
 docker tag csas-backend:v1 533267330483.dkr.ecr.ap-northeast-2.amazonaws.com/csas-backend:v1
@@ -118,7 +154,7 @@ docker tag csas-frontend:v1 533267330483.dkr.ecr.ap-northeast-2.amazonaws.com/cs
 docker tag csas-python:v1 533267330483.dkr.ecr.ap-northeast-2.amazonaws.com/csas-python:v1
 ```
 
-### 7. Push images
+### 8. Push images
 
 ```powershell
 docker push 533267330483.dkr.ecr.ap-northeast-2.amazonaws.com/csas-backend:v1
@@ -126,7 +162,7 @@ docker push 533267330483.dkr.ecr.ap-northeast-2.amazonaws.com/csas-frontend:v1
 docker push 533267330483.dkr.ecr.ap-northeast-2.amazonaws.com/csas-python:v1
 ```
 
-### 8. Create runtime secret
+### 9. Create runtime secret
 
 Create the backend runtime secret before applying manifests. Do not commit real secrets.
 
@@ -148,7 +184,7 @@ kubectl create secret generic opensearch-master-secrets `
 
 If the secret already exists, update it with the real values or delete and recreate it.
 
-### 9. Deploy to EKS
+### 10. Deploy to EKS
 
 ```powershell
 kubectl apply -f k8s/
@@ -159,7 +195,25 @@ kubectl rollout status deployment/python
 
 ### GitHub Actions
 
-The workflow in `.github/workflows/deploy-eks.yml` uses Git SHA image tags, creates missing ECR repositories if needed, pushes images to `csas-backend`, `csas-frontend`, and `csas-python`, then updates the EKS deployments with `kubectl set image`.
+The workflow in `.github/workflows/deploy-eks.yml` uses Git SHA image tags, creates missing ECR repositories if needed, pushes images to `csas-backend` and `csas-frontend`, then updates the backend and frontend EKS deployments with `kubectl set image`.
+
+The Python AI server is intentionally excluded from GitHub Actions. Build and push `csas-python` manually when the AI server or bundled model changes, then update the Python deployment image yourself.
+
+Manual Python AI image deployment:
+
+```powershell
+$TAG="ai-v1"
+
+aws ecr get-login-password --region ap-northeast-2 `
+  | docker login --username AWS --password-stdin 533267330483.dkr.ecr.ap-northeast-2.amazonaws.com
+
+docker build -t csas-python:$TAG .\python
+docker tag csas-python:$TAG 533267330483.dkr.ecr.ap-northeast-2.amazonaws.com/csas-python:$TAG
+docker push 533267330483.dkr.ecr.ap-northeast-2.amazonaws.com/csas-python:$TAG
+
+kubectl set image deployment/python python=533267330483.dkr.ecr.ap-northeast-2.amazonaws.com/csas-python:$TAG
+kubectl rollout status deployment/python
+```
 
 Required GitHub Secrets:
 
