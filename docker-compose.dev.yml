@@ -1,21 +1,38 @@
-# TODO: Define local development services for frontend, backend, and python.
-# This file is a placeholder for the future Docker Compose development setup.
-
 services:
   frontend:
-    # TODO: Build and run the React/Vite development server.
     build:
       context: ./frontend
       dockerfile: Dockerfile.dev
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_BACKEND_BASE_URL=http://localhost:8080
+      - VITE_GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+    depends_on:
+      - backend
 
   backend:
-    # TODO: Build and run the Spring Boot development server.
     build:
       context: ./backend
       dockerfile: Dockerfile.dev
+    ports:
+      - "8080:8080"
+    environment:
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_REGION=${AWS_REGION}
+      - S3_BUCKET_NAME=${S3_BUCKET_NAME}
+      - OPENSEARCH_ENDPOINT=${OPENSEARCH_ENDPOINT}
+      - OPENSEARCH_REGION=${OPENSEARCH_REGION}
+      - OPENSEARCH_SERVICE=${OPENSEARCH_SERVICE:-es}
+      - OPENSEARCH_INDEX_NAME=${OPENSEARCH_INDEX_NAME:-crack-analysis-results}
+      - AI_BASE_URL=http://python:8000
+      - AI_ANALYZE_PATH=/api/analyze
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
 
   python:
-    # TODO: Build and run the Python FastAPI AI server.
     build:
       context: ./python
       dockerfile: Dockerfile.dev
+    ports:
+      - "8000:8000"
