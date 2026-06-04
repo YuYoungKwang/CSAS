@@ -1,6 +1,6 @@
 from typing import List, Optional
 
-from fastapi import FastAPI
+from fastapi import FastAPI, File, UploadFile
 from pydantic import BaseModel, Field
 
 
@@ -30,7 +30,7 @@ def health():
 
 
 @app.post("/api/analyze", response_model=AiAnalysisResponse)
-def analyze(request: AiAnalysisRequest):
+def analyze(file: UploadFile = File(...)):
     return {
         "status": "success",
         "message": None,

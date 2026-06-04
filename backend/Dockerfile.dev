@@ -1,10 +1,1 @@
-FROM gradle:8.10.2-jdk17
-
-WORKDIR /app
-
-COPY build.gradle settings.gradle ./
-COPY src ./src
-
-EXPOSE 8080
-
-CMD ["gradle", "bootRun"]
+# TODO: Configure Docker image for the Spring Boot development server.

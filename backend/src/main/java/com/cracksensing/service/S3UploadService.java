@@ -98,7 +98,7 @@ public class S3UploadService {
         }
 
         String objectUrl = createObjectUrl(objectKey);
-        AiAnalysisResponse aiAnalysis = aiAnalysisClient.analyze(objectKey);
+        AiAnalysisResponse aiAnalysis = aiAnalysisClient.analyze(file);
         AnalysisRecord analysisRecord = new AnalysisRecord(
                 objectKey,
                 Instant.now(),
