@@ -18,6 +18,20 @@ spec:
         - name: python
           image: 533267330483.dkr.ecr.ap-northeast-2.amazonaws.com/csas-python:v1
           imagePullPolicy: Always
+          env:
+            - name: AWS_REGION
+              value: ap-northeast-2
+            - name: S3_BUCKET_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: backend-secrets
+                  key: S3_BUCKET_NAME
+            - name: MODEL_S3_URI
+              value: s3://cracksensing-models-dev/models/crack/v1/best.pt
+            - name: MODEL_CLASSES_S3_URI
+              value: s3://cracksensing-models-dev/models/crack/v1/classes.json
+            - name: MODEL_CONFIG_S3_URI
+              value: s3://cracksensing-models-dev/models/crack/v1/config.yaml
           ports:
             - containerPort: 8000
           readinessProbe:

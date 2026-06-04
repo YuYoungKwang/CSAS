@@ -23,8 +23,10 @@ spec:
           env:
             - name: AWS_REGION
               value: ap-northeast-2
-            - name: CLASSIFIER_BASE_URL
+            - name: AI_BASE_URL
               value: http://python:8000
+            - name: AI_ANALYZE_PATH
+              value: /api/analyze
             - name: OPENSEARCH_SERVICE
               value: es
             - name: OPENSEARCH_INDEX_NAME
@@ -44,6 +46,11 @@ spec:
                 secretKeyRef:
                   name: backend-secrets
                   key: OPENSEARCH_REGION
+            - name: GOOGLE_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: backend-secrets
+                  key: GOOGLE_CLIENT_ID
           readinessProbe:
             httpGet:
               path: /health
