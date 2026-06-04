@@ -43,6 +43,7 @@ public class S3UploadService {
     private final S3Client s3Client;
     private final AiAnalysisClient aiAnalysisClient;
     private final OpenSearchStorageService openSearchStorageService;
+    private final S3PresignedUrlService s3PresignedUrlService;
     private final String bucketName;
     private final String awsRegion;
 
@@ -50,12 +51,14 @@ public class S3UploadService {
             S3Client s3Client,
             AiAnalysisClient aiAnalysisClient,
             OpenSearchStorageService openSearchStorageService,
+            S3PresignedUrlService s3PresignedUrlService,
             @Value("${s3.bucket-name}") String bucketName,
             @Value("${aws.region}") String awsRegion
     ) {
         this.s3Client = s3Client;
         this.aiAnalysisClient = aiAnalysisClient;
         this.openSearchStorageService = openSearchStorageService;
+        this.s3PresignedUrlService = s3PresignedUrlService;
         this.bucketName = bucketName;
         this.awsRegion = awsRegion;
     }
@@ -104,7 +107,8 @@ public class S3UploadService {
                 userId,
                 aiAnalysis
         );
-        return openSearchStorageService.save(analysisRecord);
+        AnalysisRecord storedRecord = openSearchStorageService.save(analysisRecord);
+        return withPresignedUrl(storedRecord);
     }
 
     private void validateFile(MultipartFile file) {
@@ -149,6 +153,23 @@ public class S3UploadService {
         }
 
         return "https://%s.s3.%s.amazonaws.com/%s".formatted(bucketName, awsRegion, objectKey);
+    }
+
+    private AnalysisRecord withPresignedUrl(AnalysisRecord record) {
+        String presignedUrl = s3PresignedUrlService.createReadUrl(record.objectKey());
+        if (!StringUtils.hasText(presignedUrl)) {
+            return record;
+        }
+
+        return new AnalysisRecord(
+                record.objectKey(),
+                record.savedAt(),
+                presignedUrl,
+                record.originalFileName(),
+                record.fileSize(),
+                record.userId(),
+                record.aiAnalysis()
+        );
     }
 
     private String getExtension(String fileName) {

@@ -24,13 +24,16 @@ public class AlbumQueryService {
     private static final Logger log = LoggerFactory.getLogger(AlbumQueryService.class);
 
     private final OpenSearchClient openSearchClient;
+    private final S3PresignedUrlService s3PresignedUrlService;
     private final String indexName;
 
     public AlbumQueryService(
             ObjectProvider<OpenSearchClient> openSearchClientProvider,
+            S3PresignedUrlService s3PresignedUrlService,
             @Value("${opensearch.index-name:crack-analysis-results}") String indexName
     ) {
         this.openSearchClient = openSearchClientProvider.getIfAvailable();
+        this.s3PresignedUrlService = s3PresignedUrlService;
         this.indexName = indexName;
     }
 
@@ -92,7 +95,7 @@ public class AlbumQueryService {
         return new AlbumSummaryResponse(
                 record.objectKey(),
                 record.savedAt(),
-                record.objectUrl(),
+                createPresignedUrl(record),
                 record.originalFileName(),
                 record.userId(),
                 defectFound,
@@ -110,7 +113,7 @@ public class AlbumQueryService {
         return new AlbumDetailResponse(
                 record.objectKey(),
                 record.savedAt(),
-                record.objectUrl(),
+                createPresignedUrl(record),
                 record.originalFileName(),
                 record.fileSize(),
                 record.userId(),
@@ -136,5 +139,10 @@ public class AlbumQueryService {
 
     private int getAnnotationCount(AiAnalysisResponse aiAnalysis) {
         return aiAnalysis == null || aiAnalysis.annotations() == null ? 0 : aiAnalysis.annotations().size();
+    }
+
+    private String createPresignedUrl(AnalysisRecord record) {
+        String presignedUrl = s3PresignedUrlService.createReadUrl(record.objectKey());
+        return presignedUrl != null ? presignedUrl : record.objectUrl();
     }
 }
