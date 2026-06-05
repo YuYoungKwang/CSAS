@@ -7,6 +7,7 @@ services:
       - "5173:5173"
     environment:
       - VITE_BACKEND_BASE_URL=http://localhost:8080
+      - VITE_GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
     depends_on:
       - backend
 
@@ -16,18 +17,18 @@ services:
       dockerfile: Dockerfile.dev
     ports:
       - "8080:8080"
-    depends_on:
-      - python
     environment:
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
       - AWS_REGION=${AWS_REGION}
       - S3_BUCKET_NAME=${S3_BUCKET_NAME}
-      - CLASSIFIER_BASE_URL=http://python:8000
       - OPENSEARCH_ENDPOINT=${OPENSEARCH_ENDPOINT}
       - OPENSEARCH_REGION=${OPENSEARCH_REGION}
       - OPENSEARCH_SERVICE=${OPENSEARCH_SERVICE:-es}
       - OPENSEARCH_INDEX_NAME=${OPENSEARCH_INDEX_NAME:-crack-analysis-results}
+      - AI_BASE_URL=http://python:8000
+      - AI_ANALYZE_PATH=/api/analyze
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
 
   python:
     build:

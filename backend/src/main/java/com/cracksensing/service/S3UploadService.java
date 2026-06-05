@@ -2,11 +2,11 @@ package com.cracksensing.service;
 
 import java.io.IOException;
 import java.time.LocalDate;
+import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.time.Instant;
-import java.util.Map;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -14,9 +14,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.cracksensing.dto.AnalysisRecord;
-import com.cracksensing.dto.ClassifierResponse;
+import com.cracksensing.dto.AiAnalysisResponse;
 import com.cracksensing.exception.InvalidImageFileException;
 import com.cracksensing.exception.OpenSearchStorageException;
 import com.cracksensing.exception.S3UploadException;
@@ -29,6 +31,7 @@ import software.amazon.awssdk.services.s3.model.S3Exception;
 @Service
 public class S3UploadService {
 
+    private static final Logger log = LoggerFactory.getLogger(S3UploadService.class);
     private static final Set<String> ALLOWED_EXTENSIONS = Set.of("jpg", "jpeg", "png");
     private static final Map<String, String> ALLOWED_CONTENT_TYPES_BY_EXTENSION = Map.of(
             "jpg", "image/jpeg",
@@ -39,23 +42,30 @@ public class S3UploadService {
     private static final ZoneId SEOUL_ZONE = ZoneId.of("Asia/Seoul");
 
     private final S3Client s3Client;
-    private final ClassifierClient classifierClient;
+    private final AiAnalysisClient aiAnalysisClient;
     private final OpenSearchStorageService openSearchStorageService;
+    private final S3PresignedUrlService s3PresignedUrlService;
     private final String bucketName;
     private final String awsRegion;
 
     public S3UploadService(
             S3Client s3Client,
-            ClassifierClient classifierClient,
+            AiAnalysisClient aiAnalysisClient,
             OpenSearchStorageService openSearchStorageService,
+            S3PresignedUrlService s3PresignedUrlService,
             @Value("${s3.bucket-name}") String bucketName,
             @Value("${aws.region}") String awsRegion
     ) {
         this.s3Client = s3Client;
-        this.classifierClient = classifierClient;
+        this.aiAnalysisClient = aiAnalysisClient;
         this.openSearchStorageService = openSearchStorageService;
+        this.s3PresignedUrlService = s3PresignedUrlService;
         this.bucketName = bucketName;
         this.awsRegion = awsRegion;
+    }
+
+    public AnalysisRecord uploadImage(MultipartFile file) {
+        return uploadImage(file, "demo-user-001");
     }
 
     public AnalysisRecord uploadImage(MultipartFile file, String userId) {
@@ -75,41 +85,72 @@ public class S3UploadService {
         try {
             s3Client.putObject(putObjectRequest, RequestBody.fromInputStream(file.getInputStream(), file.getSize()));
         } catch (S3Exception | IOException exception) {
+            log.error(
+                    "Image upload failed while saving to S3. originalFileName={}, contentType={}, size={}, bucket={}, objectKey={}",
+                    originalFileName,
+                    file.getContentType(),
+                    file.getSize(),
+                    bucketName,
+                    objectKey,
+                    exception
+            );
             throw new S3UploadException("Failed to upload image to S3.", exception);
         }
 
         String objectUrl = createObjectUrl(objectKey);
-        ClassifierResponse classifierResponse = classifierClient.sendToClassifier(objectKey, objectUrl);
+        AiAnalysisResponse aiAnalysis = aiAnalysisClient.analyze(file);
         AnalysisRecord analysisRecord = new AnalysisRecord(
                 objectKey,
-                userId,
                 Instant.now(),
                 objectUrl,
-                classifierResponse.cracked(),
-                classifierResponse.crackType(),
-                classifierResponse.crackPos()
+                originalFileName,
+                file.getSize(),
+                userId,
+                aiAnalysis
         );
-
+        AnalysisRecord storedRecord;
         try {
-            return openSearchStorageService.save(analysisRecord);
+            storedRecord = openSearchStorageService.save(analysisRecord);
         } catch (OpenSearchStorageException exception) {
-            throw exception;
+            log.error(
+                    "Image uploaded to S3, but failed to save analysis record to OpenSearch. objectKey={}, objectUrl={}",
+                    objectKey,
+                    objectUrl,
+                    exception
+            );
+            storedRecord = analysisRecord;
         }
+
+        return withPresignedUrl(storedRecord);
     }
 
     private void validateFile(MultipartFile file) {
         if (file == null || file.isEmpty()) {
+            log.warn("Image upload rejected: file is missing or empty.");
             throw new InvalidImageFileException("Image file is required.");
         }
 
         String extension = getExtension(file.getOriginalFilename());
         if (!ALLOWED_EXTENSIONS.contains(extension)) {
+            log.warn(
+                    "Image upload rejected: unsupported file extension. originalFileName={}, extension={}, allowedExtensions={}",
+                    file.getOriginalFilename(),
+                    extension,
+                    ALLOWED_EXTENSIONS
+            );
             throw new InvalidImageFileException("Only jpg, jpeg, and png images are allowed.");
         }
 
         String contentType = file.getContentType();
         String allowedContentType = ALLOWED_CONTENT_TYPES_BY_EXTENSION.get(extension);
         if (!StringUtils.hasText(contentType) || !allowedContentType.equalsIgnoreCase(contentType)) {
+            log.warn(
+                    "Image upload rejected: extension and content type do not match. originalFileName={}, extension={}, contentType={}, expectedContentType={}",
+                    file.getOriginalFilename(),
+                    extension,
+                    contentType,
+                    allowedContentType
+            );
             throw new InvalidImageFileException("File extension and content type do not match.");
         }
     }
@@ -125,6 +166,23 @@ public class S3UploadService {
         }
 
         return "https://%s.s3.%s.amazonaws.com/%s".formatted(bucketName, awsRegion, objectKey);
+    }
+
+    private AnalysisRecord withPresignedUrl(AnalysisRecord record) {
+        String presignedUrl = s3PresignedUrlService.createReadUrl(record.objectKey());
+        if (!StringUtils.hasText(presignedUrl)) {
+            return record;
+        }
+
+        return new AnalysisRecord(
+                record.objectKey(),
+                record.savedAt(),
+                presignedUrl,
+                record.originalFileName(),
+                record.fileSize(),
+                record.userId(),
+                record.aiAnalysis()
+        );
     }
 
     private String getExtension(String fileName) {

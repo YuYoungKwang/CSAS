@@ -1,16 +1,18 @@
 package com.cracksensing.service;
 
 import com.cracksensing.dto.AnalysisRecord;
-import com.cracksensing.exception.OpenSearchStorageException;
 
 import org.opensearch.client.opensearch.OpenSearchClient;
-import org.opensearch.client.opensearch.core.IndexResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 @Service
 public class OpenSearchStorageService {
+
+    private static final Logger log = LoggerFactory.getLogger(OpenSearchStorageService.class);
 
     private final OpenSearchClient openSearchClient;
     private final String indexName;
@@ -25,18 +27,28 @@ public class OpenSearchStorageService {
 
     public AnalysisRecord save(AnalysisRecord record) {
         if (openSearchClient == null) {
-            throw new OpenSearchStorageException("OpenSearch is not configured.");
+            log.warn(
+                    "OpenSearch is not configured. Skipping analysis record storage and returning S3 upload result only. objectKey={}",
+                    record.objectKey()
+            );
+            return record;
         }
 
         try {
             openSearchClient.index(index -> index
                     .index(indexName)
-                    .id(record.imageId())
+                    .id(record.objectKey())
                     .document(record)
             );
             return record;
         } catch (Exception exception) {
-            throw new OpenSearchStorageException("Failed to save analysis record to OpenSearch.", exception);
+            log.error(
+                    "Failed to save analysis record to OpenSearch. objectKey={}, indexName={}",
+                    record.objectKey(),
+                    indexName,
+                    exception
+            );
+            return record;
         }
     }
 }

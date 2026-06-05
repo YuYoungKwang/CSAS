@@ -19,13 +19,11 @@ docker compose -f docker-compose.dev.yml up --build
 - Method: `POST`
 - URL: `http://localhost:8080/api/images/upload`
 - Form field: `file`
-- Form field: `userId`
 
 예시 요청:
 
 ```bash
 curl -X POST "http://localhost:8080/api/images/upload" \
-  -F "userId=user-123" \
   -F "file=@/path/to/image.jpg"
 ```
 
@@ -33,51 +31,18 @@ curl -X POST "http://localhost:8080/api/images/upload" \
 
 ```json
 {
-  "imageId": "images/2026/06/01/uuid.jpg",
-  "userId": "user-123",
+  "objectKey": "images/2026/06/01/uuid.jpg",
   "savedAt": "2026-06-01T10:00:00Z",
   "objectUrl": "https://bucket-name.s3.ap-northeast-2.amazonaws.com/images/2026/06/01/uuid.jpg",
-  "cracked": 1,
-  "crackType": 7,
-  "crackPos": [
-    [14, 10],
-    [31, 85]
-  ]
+  "originalFileName": "image.jpg",
+  "fileSize": 123456
 }
 ```
-
-## Classifier 연동
-
-백엔드는 S3 저장이 끝나면 classifier 서버로 다음 정보를 전송합니다.
-
-- `imageId`: S3 `objectKey`
-- `objectUrl`: S3 객체 URL
-
-classifier 서버 응답 예시:
-
-```json
-{
-  "imageId": "images/2026/06/01/uuid.jpg",
-  "cracked": 1,
-  "crackType": 7,
-  "crackPos": [
-    [14, 10],
-    [31, 85]
-  ]
-}
-```
-
-기본 요청 경로는 다음과 같습니다.
-
-- `POST http://localhost:8000/api/classify`
-
-도커 환경에서는 `CLASSIFIER_BASE_URL=http://python:8000` 을 사용합니다.
 
 ## 설정
 
 - `AWS_REGION`: S3 리전
 - `S3_BUCKET_NAME`: 업로드 대상 버킷 이름
-- `CLASSIFIER_BASE_URL`: classifier 서버 주소
 - `OPENSEARCH_ENDPOINT`: OpenSearch 엔드포인트
 - `OPENSEARCH_REGION`: OpenSearch 리전
 - `OPENSEARCH_SERVICE`: OpenSearch 서비스 이름

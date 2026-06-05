@@ -2,7 +2,11 @@ package com.cracksensing.config;
 
 import java.net.URI;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.opensearch.client.opensearch.OpenSearchClient;
+import org.opensearch.client.json.jackson.JacksonJsonpMapper;
 import org.opensearch.client.transport.aws.AwsSdk2Transport;
 import org.opensearch.client.transport.aws.AwsSdk2TransportOptions;
 import org.springframework.beans.factory.annotation.Value;
@@ -32,6 +36,9 @@ public class OpenSearchConfig {
             @Value("${opensearch.service:es}") String service
     ) {
         String normalizedEndpoint = normalizeEndpoint(endpoint);
+        ObjectMapper objectMapper = new ObjectMapper()
+                .registerModule(new JavaTimeModule())
+                .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
         return new OpenSearchClient(
                 new AwsSdk2Transport(
@@ -39,7 +46,9 @@ public class OpenSearchConfig {
                         normalizedEndpoint,
                         service,
                         Region.of(region),
-                        AwsSdk2TransportOptions.builder().build()
+                        AwsSdk2TransportOptions.builder()
+                                .setMapper(new JacksonJsonpMapper(objectMapper))
+                                .build()
                 )
         );
     }

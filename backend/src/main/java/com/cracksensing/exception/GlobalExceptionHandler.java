@@ -2,7 +2,6 @@ package com.cracksensing.exception;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
@@ -13,16 +12,21 @@ import com.cracksensing.dto.ErrorResponse;
 
 import java.time.Instant;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import jakarta.servlet.http.HttpServletRequest;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(InvalidImageFileException.class)
     public ResponseEntity<ErrorResponse> handleInvalidImageFile(
             InvalidImageFileException exception,
             HttpServletRequest request
     ) {
+        log.warn("Invalid image upload request. path={}, message={}", request.getRequestURI(), exception.getMessage());
         return buildErrorResponse(HttpStatus.BAD_REQUEST, exception.getMessage(), request);
     }
 
@@ -31,33 +35,10 @@ public class GlobalExceptionHandler {
             S3UploadException exception,
             HttpServletRequest request
     ) {
+        log.error("S3 upload failed. path={}, message={}", request.getRequestURI(), exception.getMessage(), exception);
         return buildErrorResponse(
                 HttpStatus.INTERNAL_SERVER_ERROR,
                 "Image upload failed while saving the file to S3.",
-                request
-        );
-    }
-
-    @ExceptionHandler(OpenSearchStorageException.class)
-    public ResponseEntity<ErrorResponse> handleOpenSearchStorageFailure(
-            OpenSearchStorageException exception,
-            HttpServletRequest request
-    ) {
-        return buildErrorResponse(
-                HttpStatus.BAD_GATEWAY,
-                "Image was analyzed, but saving the analysis record to OpenSearch failed.",
-                request
-        );
-    }
-
-    @ExceptionHandler(ClassifierDispatchException.class)
-    public ResponseEntity<ErrorResponse> handleClassifierDispatchFailure(
-            ClassifierDispatchException exception,
-            HttpServletRequest request
-    ) {
-        return buildErrorResponse(
-                HttpStatus.BAD_GATEWAY,
-                "Image was saved to S3, but sending it to the classifier server failed.",
                 request
         );
     }
@@ -67,6 +48,7 @@ public class GlobalExceptionHandler {
             MaxUploadSizeExceededException exception,
             HttpServletRequest request
     ) {
+        log.warn("Multipart upload rejected because file size exceeded limit. path={}, message={}", request.getRequestURI(), exception.getMessage());
         return buildErrorResponse(HttpStatus.PAYLOAD_TOO_LARGE, exception.getMessage(), request);
     }
 
@@ -75,21 +57,10 @@ public class GlobalExceptionHandler {
             MissingServletRequestPartException exception,
             HttpServletRequest request
     ) {
+        log.warn("Multipart upload rejected because file part is missing. path={}, message={}", request.getRequestURI(), exception.getMessage());
         return buildErrorResponse(
                 HttpStatus.BAD_REQUEST,
                 "Request must include a file part named 'file'.",
-                request
-        );
-    }
-
-    @ExceptionHandler(MissingServletRequestParameterException.class)
-    public ResponseEntity<ErrorResponse> handleMissingRequestParameter(
-            MissingServletRequestParameterException exception,
-            HttpServletRequest request
-    ) {
-        return buildErrorResponse(
-                HttpStatus.BAD_REQUEST,
-                "Request must include a userId parameter.",
                 request
         );
     }
@@ -99,11 +70,21 @@ public class GlobalExceptionHandler {
             MultipartException exception,
             HttpServletRequest request
     ) {
+        log.warn("Multipart upload rejected because request format is invalid. path={}, message={}", request.getRequestURI(), exception.getMessage());
         return buildErrorResponse(
                 HttpStatus.BAD_REQUEST,
                 "Request must be sent as multipart/form-data.",
                 request
         );
+    }
+
+    @ExceptionHandler(GoogleAuthenticationException.class)
+    public ResponseEntity<ErrorResponse> handleGoogleAuthenticationException(
+            GoogleAuthenticationException exception,
+            HttpServletRequest request
+    ) {
+        log.warn("Google authentication failed. path={}, message={}", request.getRequestURI(), exception.getMessage());
+        return buildErrorResponse(HttpStatus.UNAUTHORIZED, exception.getMessage(), request);
     }
 
     private ResponseEntity<ErrorResponse> buildErrorResponse(

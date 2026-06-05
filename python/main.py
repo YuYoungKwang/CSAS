@@ -1,20 +1,27 @@
-from fastapi import FastAPI
-from pydantic import BaseModel, HttpUrl
+from typing import List, Optional
+
+from fastapi import FastAPI, File, UploadFile
+from pydantic import BaseModel, Field
 
 
 app = FastAPI(title="crackSensingAiService AI Server")
 
 
-class ClassifierRequest(BaseModel):
-    imageId: str
-    objectUrl: HttpUrl
+class AiAnalysisRequest(BaseModel):
+    objectKey: str = Field(..., min_length=1)
 
 
-class ClassifierResponse(BaseModel):
-    imageId: str
-    cracked: int
-    crackType: int
-    crackPos: list[list[int]]
+class AiAnnotation(BaseModel):
+    class_id: int
+    class_name: str
+    points: List[List[int]]
+
+
+class AiAnalysisResponse(BaseModel):
+    status: str
+    message: Optional[str] = None
+    defect_found: bool
+    annotations: List[AiAnnotation]
 
 
 @app.get("/health")
@@ -22,11 +29,11 @@ def health():
     return {"status": "UP"}
 
 
-@app.post("/api/classify")
-def classify(payload: ClassifierRequest):
-    return ClassifierResponse(
-        imageId=payload.imageId,
-        cracked=1,
-        crackType=7,
-        crackPos=[[14, 10], [31, 85]],
-    )
+@app.post("/api/analyze", response_model=AiAnalysisResponse)
+def analyze(file: UploadFile = File(...)):
+    return {
+        "status": "success",
+        "message": None,
+        "defect_found": False,
+        "annotations": [],
+    }
