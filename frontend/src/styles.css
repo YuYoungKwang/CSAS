@@ -603,23 +603,32 @@ dd {
 
 .filter-row {
   display: flex;
+  align-items: center;
   gap: 8px;
   overflow-x: auto;
+  overflow-y: hidden;
   width: 100%;
+  min-height: 52px;
   min-width: 0;
-  padding: 0 0 8px;
+  padding: 0 0 12px;
   scrollbar-width: thin;
 }
 
 .filter-row button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex: 0 0 auto;
-  min-height: 38px;
+  height: 40px;
+  min-width: 64px;
   border: 3px solid #20371d;
   border-radius: 0;
   padding: 0 14px;
   background: #d6cf8b;
   color: #263022;
   font-weight: 900;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .filter-row button.active {
