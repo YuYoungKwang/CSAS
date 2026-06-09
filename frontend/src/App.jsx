@@ -40,25 +40,23 @@ const text = {
   uploadFailed: '\uC5C5\uB85C\uB4DC\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4. \uBC31\uC5D4\uB4DC\uB97C \uD655\uC778\uD574\uC8FC\uC138\uC694.',
   result: '\uBD84\uC11D \uACB0\uACFC',
   waiting: '\uBD84\uC11D \uB300\uAE30',
-  severity: '\uC704\uD5D8\uB3C4',
-  defectType: '\uACB0\uD568 \uC720\uD615',
+  defectType: '\uADE0\uC5F4 \uC885\uB958',
+  defectTypes: '\uADE0\uC5F4 \uC885\uB958',
+  analyzedAt: '\uBD84\uC11D \uC2DC\uAC04',
+  coordinates: '\uC704\uCE58 \uC88C\uD45C',
   confidence: '\uC2E0\uB8B0\uB3C4',
   ratio: '\uACB0\uD568 \uBA74\uC801\uBE44',
   albumTitle: '\uBD84\uC11D \uC568\uBC94',
   albumDetailTitle: '\uC0C1\uC138 \uC815\uBCF4',
   albumLoading: '\uC568\uBC94 \uB85C\uB529 \uC911',
   albumLoadFailed: '\uC568\uBC94 \uB85C\uB529\uc5d0 \uC2E4\ud328\ud588\uc2b5\ub2c8\ub2e4.',
-  annotationCount: '\uC8FC\uC11D \uAC1C\uC218',
-  aiStatus: 'AI \uC0C1\uD0DC',
   search: '\uAC80\uC0C9',
   searchPlaceholder: '\uC704\uCE58, \uACB0\uD568 \uC720\uD615, \uBA54\uBAA8 \uAC80\uC0C9',
   all: '\uC804\uCCB4',
   recent: '\uCD5C\uADFC',
   sortName: '\uC774\uB984',
   sortDefectType: '\uADE0\uC5F4\uC885\uB958',
-  safe: '\uC591\uD638',
-  watch: '\uC8FC\uC758',
-  alert: '\uACBD\uACC4',
+  safe: '\uC815\uC0C1',
   danger: '\uC704\uD5D8',
   emptyAlbum: '\uC870\uAC74\uC5D0 \uB9DE\uB294 \uC568\uBC94\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.',
   server: '\uC11C\uBC84',
@@ -72,17 +70,17 @@ const filters = [
 ];
 
 const defectTypeOptions = [
-  { value: 'normal', label: '정상', aliases: ['정상', '양호', 'safe', 'normal'] },
-  { value: 'crack', label: '균열', aliases: ['균열', 'crack', 'damage'] },
-  { value: 'leakage', label: '누수', aliases: ['누수', 'leak', 'leakage'] },
-  { value: 'efflorescence', label: '백태', aliases: ['백태', 'efflorescence'] },
-  { value: 'peeling', label: '박리', aliases: ['박리', 'peeling'] },
-  { value: 'spalling', label: '박락', aliases: ['박락', 'spalling'] },
-  { value: 'rebar', label: '철근노출', aliases: ['철근노출', 'rebar', 'rebar exposure'] },
-  { value: 'contamination', label: '오염', aliases: ['오염', 'contamination', 'stain'] },
-  { value: 'breakage', label: '파손', aliases: ['파손', 'breakage', 'broken'] },
-  { value: 'delamination', label: '들뜸', aliases: ['들뜸', 'delamination'] },
-  { value: 'other', label: '기타', aliases: ['기타', 'other'] },
+  { value: 'normal', label: '\uC815\uC0C1', aliases: ['\uC815\uC0C1', '\uC591\uD638', 'safe', 'normal'] },
+  { value: 'crack', label: '\uADE0\uC5F4', aliases: ['\uADE0\uC5F4', 'crack', 'damage'] },
+  { value: 'leakage', label: '\uB204\uC218', aliases: ['\uB204\uC218', 'leak', 'leakage'] },
+  { value: 'efflorescence', label: '\uBC31\uD0DC', aliases: ['\uBC31\uD0DC', 'efflorescence'] },
+  { value: 'peeling', label: '\uBC15\uB9AC', aliases: ['\uBC15\uB9AC', 'peeling'] },
+  { value: 'spalling', label: '\uBC15\uB77D', aliases: ['\uBC15\uB77D', 'spalling'] },
+  { value: 'rebar', label: '\uCCA0\uADFC\uB178\uCD9C', aliases: ['\uCCA0\uADFC\uB178\uCD9C', 'rebar', 'rebar exposure'] },
+  { value: 'contamination', label: '\uC624\uC5FC', aliases: ['\uC624\uC5FC', 'contamination', 'stain'] },
+  { value: 'breakage', label: '\uD30C\uC190', aliases: ['\uD30C\uC190', 'breakage', 'broken'] },
+  { value: 'delamination', label: '\uB4E4\uB728\uC784', aliases: ['\uB4E4\uB728\uC784', 'delamination'] },
+  { value: 'other', label: '\uAE30\uD0C0', aliases: ['\uAE30\uD0C0', 'other'] },
 ];
 
 function formatDate(value) {
@@ -106,7 +104,7 @@ function getDefectLabel(aiAnalysis) {
 
   const annotations = aiAnalysis?.annotations ?? [];
   const firstAnnotation = annotations[0];
-  return firstAnnotation?.class_name ?? firstAnnotation?.className ?? text.danger;
+  return firstAnnotation?.class_name ?? firstAnnotation?.className ?? text.safe;
 }
 
 function getRecordDefectLabels(record) {
@@ -118,10 +116,115 @@ function getRecordDefectLabels(record) {
     .map((label) => String(label).trim().toLowerCase());
 
   if (labels.length === 0 && record.severity === 'safe') {
-    return ['normal', 'safe', '정상', '양호'];
+    return ['normal', 'safe', '\uC815\uC0C1', '\uC591\uD638'];
   }
 
   return labels;
+}
+
+function getAnnotationClassName(annotation) {
+  return annotation?.class_name ?? annotation?.className ?? text.safe;
+}
+
+function getAnnotationPoints(annotation) {
+  return Array.isArray(annotation?.points) ? annotation.points : [];
+}
+
+function getUniqueAnnotationTypes(annotations = []) {
+  const names = annotations.map(getAnnotationClassName).filter(Boolean);
+  return [...new Set(names)];
+}
+
+function formatPoint(point) {
+  const [x = 0, y = 0] = point ?? [];
+  return `(${x}, ${y})`;
+}
+
+function formatCoordinateSummary(points) {
+  if (!points.length) {
+    return '-';
+  }
+
+  const visiblePoints = points.slice(0, 8).map(formatPoint).join(' ');
+  return points.length > 8 ? `${visiblePoints} ... \uC678 ${points.length - 8}\uAC1C` : visiblePoints;
+}
+
+function getAnnotationColor(index) {
+  const colors = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899'];
+  return colors[index % colors.length];
+}
+
+function normalizePoint(point, width, height) {
+  const [rawX = 0, rawY = 0] = point ?? [];
+  const x = Number(rawX);
+  const y = Number(rawY);
+
+  return {
+    x: x <= 1 ? x * width : x,
+    y: y <= 1 ? y * height : y,
+  };
+}
+
+function AnalysisImageViewer({ src, annotations = [], alt = '' }) {
+  const [split, setSplit] = useState(100);
+  const [imageSize, setImageSize] = useState({ width: 1, height: 1 });
+  const hasAnnotations = annotations.length > 0;
+
+  return (
+    <div className="analysis-viewer" style={{ '--split': `${split}%` }}>
+      <img
+        alt={alt}
+        className="analysis-image"
+        onLoad={(event) => {
+          setImageSize({
+            width: event.currentTarget.naturalWidth || 1,
+            height: event.currentTarget.naturalHeight || 1,
+          });
+        }}
+        src={src}
+      />
+      {hasAnnotations && (
+        <div className="analysis-overlay">
+          <img alt="" className="analysis-image" src={src} />
+          <svg aria-hidden="true" preserveAspectRatio="xMidYMid meet" viewBox={`0 0 ${imageSize.width} ${imageSize.height}`}>
+            {annotations.map((annotation, index) => {
+              const points = (annotation.points ?? []).map((point) => normalizePoint(point, imageSize.width, imageSize.height));
+              if (points.length === 0) {
+                return null;
+              }
+
+              const color = getAnnotationColor(index);
+              const pointString = points.map((point) => `${point.x},${point.y}`).join(' ');
+
+              return (
+                <g key={`${getAnnotationClassName(annotation)}-${index}`}>
+                  {points.length >= 3 && <polygon points={pointString} fill={color} opacity="0.18" />}
+                  <polyline points={pointString} fill="none" stroke={color} strokeLinecap="round" strokeLinejoin="round" strokeWidth="5" />
+                  {points.map((point, pointIndex) => (
+                    <circle cx={point.x} cy={point.y} fill={color} key={pointIndex} r="4" />
+                  ))}
+                </g>
+              );
+            })}
+          </svg>
+        </div>
+      )}
+      {hasAnnotations && (
+        <div className="analysis-slider">
+          <span>원본</span>
+          <input
+            aria-label="분석 오버레이 표시 비율"
+            max="100"
+            min="0"
+            onChange={(event) => setSplit(Number(event.target.value))}
+            type="range"
+            value={split}
+          />
+          <span>분석</span>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function normalizeAlbumRecord(record) {
@@ -408,10 +511,10 @@ function App() {
   });
 
   const cameraAnalysis = analysis?.aiAnalysis ?? null;
-  const cameraSeverity = getDefectSeverity(cameraAnalysis);
-  const cameraSeverityLabel = cameraSeverity === 'safe' ? text.safe : text.danger;
-  const cameraDefectType = getDefectLabel(cameraAnalysis);
-  const cameraAnnotationCount = cameraAnalysis?.annotations?.length ?? 0;
+  const cameraAnnotations = cameraAnalysis?.annotations ?? [];
+  const cameraDefectTypes = getUniqueAnnotationTypes(cameraAnnotations);
+  const selectedAlbumAnnotations = selectedAlbum?.aiAnalysis?.annotations ?? [];
+  const selectedAlbumDefectTypes = getUniqueAnnotationTypes(selectedAlbumAnnotations);
 
   const handleSelectAlbum = async (item) => {
     setSelectedAlbum(item);
@@ -702,7 +805,13 @@ function App() {
           </div>
           <p className="screen-copy">{text.cameraHint}</p>
 
-          <div className="preview-frame">{previewUrl ? <img alt="" src={previewUrl} /> : <span>{text.noImage}</span>}</div>
+          <div className="preview-frame">
+            {previewUrl ? (
+              <AnalysisImageViewer alt={selectedFile?.name ?? ''} annotations={cameraAnalysis?.annotations ?? []} src={previewUrl} />
+            ) : (
+              <span>{text.noImage}</span>
+            )}
+          </div>
 
           <div className="capture-actions">
             <label>
@@ -723,21 +832,27 @@ function App() {
           {errorMessage && <p className="message error">{errorMessage}</p>}
 
           <section className="result-card">
-            <div className={`severity-pill ${cameraSeverity}`}>{cameraSeverityLabel ?? text.waiting}</div>
+            <h3>{text.result}</h3>
             <dl>
               <div>
-                <dt>{text.defectType}</dt>
-                <dd>{cameraDefectType ?? '-'}</dd>
+                <dt>{text.defectTypes}</dt>
+                <dd>{cameraDefectTypes.length > 0 ? cameraDefectTypes.join(', ') : '-'}</dd>
               </div>
               <div>
-                <dt>{text.annotationCount}</dt>
-                <dd>{cameraAnnotationCount}</dd>
-              </div>
-              <div>
-                <dt>{text.aiStatus}</dt>
-                <dd>{cameraAnalysis?.status ?? '-'}</dd>
+                <dt>{text.coordinates}</dt>
+                <dd>{cameraAnnotations.length > 0 ? `${cameraAnnotations.length}\uAC1C \uAC80\uCD9C` : '-'}</dd>
               </div>
             </dl>
+            {cameraAnnotations.length > 0 && (
+              <div className="coordinate-list">
+                {cameraAnnotations.map((annotation, index) => (
+                  <article className="coordinate-item" key={`${getAnnotationClassName(annotation)}-${index}`}>
+                    <strong>{getAnnotationClassName(annotation)}</strong>
+                    <span>{formatCoordinateSummary(getAnnotationPoints(annotation))}</span>
+                  </article>
+                ))}
+              </div>
+            )}
           </section>
         </section>
       )}
@@ -817,7 +932,6 @@ function App() {
                     <span>{item.savedAt ? new Date(item.savedAt).toLocaleString('ko-KR') : '-'}</span>
                     <p>{item.defectType}</p>
                   </div>
-                  <em>{item.severityLabel}</em>
                 </article>
               ))
             ) : (
@@ -827,34 +941,37 @@ function App() {
 
           {selectedAlbum && (
             <section className="result-card">
-              <div className={`severity-pill ${selectedAlbum.severity ?? 'idle'}`}>{selectedAlbum.severityLabel}</div>
               <h3>{text.albumDetailTitle}</h3>
               <div className="preview-frame album-preview">
-                {selectedAlbum.objectUrl ? <img alt={selectedAlbum.originalFileName} src={selectedAlbum.objectUrl} /> : <span>{text.noImage}</span>}
+                {selectedAlbum.objectUrl ? (
+                  <AnalysisImageViewer
+                    alt={selectedAlbum.originalFileName}
+                    annotations={selectedAlbum.aiAnalysis?.annotations ?? []}
+                    src={selectedAlbum.objectUrl}
+                  />
+                ) : (
+                  <span>{text.noImage}</span>
+                )}
               </div>
               <dl>
                 <div>
-                  <dt>{text.defectType}</dt>
-                  <dd>{selectedAlbum.defectType ?? '-'}</dd>
+                  <dt>{text.defectTypes}</dt>
+                  <dd>{selectedAlbumDefectTypes.length > 0 ? selectedAlbumDefectTypes.join(', ') : selectedAlbum.defectType ?? '-'}</dd>
                 </div>
                 <div>
-                  <dt>{text.annotationCount}</dt>
-                  <dd>{selectedAlbum.annotationCount ?? 0}</dd>
-                </div>
-                <div>
-                  <dt>{text.server}</dt>
-                  <dd>{selectedAlbum.userId ?? '-'}</dd>
+                  <dt>{text.analyzedAt}</dt>
+                  <dd>{formatDate(selectedAlbum.savedAt)}</dd>
                 </div>
               </dl>
-              {selectedAlbum.aiAnalysis && (
-                <div className="analysis-summary">
-                  <p>
-                    <strong>{text.aiStatus}:</strong> {selectedAlbum.aiAnalysis.status ?? '-'}
-                  </p>
-                  <p>
-                    <strong>Defect:</strong> {String(selectedAlbum.aiAnalysis.defect_found ?? selectedAlbum.aiAnalysis.defectFound ?? false)}
-                  </p>
-                  <pre>{JSON.stringify(selectedAlbum.aiAnalysis.annotations ?? [], null, 2)}</pre>
+              {selectedAlbumAnnotations.length > 0 && (
+                <div className="coordinate-list">
+                  <h4>{text.coordinates}</h4>
+                  {selectedAlbumAnnotations.map((annotation, index) => (
+                    <article className="coordinate-item" key={`${getAnnotationClassName(annotation)}-${index}`}>
+                      <strong>{getAnnotationClassName(annotation)}</strong>
+                      <span>{formatCoordinateSummary(getAnnotationPoints(annotation))}</span>
+                    </article>
+                  ))}
                 </div>
               )}
             </section>
