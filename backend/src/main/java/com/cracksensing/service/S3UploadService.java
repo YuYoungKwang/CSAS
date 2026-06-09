@@ -64,10 +64,14 @@ public class S3UploadService {
     }
 
     public AnalysisRecord uploadImage(MultipartFile file) {
-        return uploadImage(file, "demo-user-001");
+        return uploadImage(file, "demo-user-001", null, null);
     }
 
     public AnalysisRecord uploadImage(MultipartFile file, String userId) {
+        return uploadImage(file, userId, null, null);
+    }
+
+    public AnalysisRecord uploadImage(MultipartFile file, String userId, Double latitude, Double longitude) {
         validateFile(file);
 
         String originalFileName = file.getOriginalFilename();
@@ -105,6 +109,8 @@ public class S3UploadService {
                 originalFileName,
                 file.getSize(),
                 userId,
+                latitude,
+                longitude,
                 aiAnalysis
         );
         AnalysisRecord storedRecord = weaviateStorageService.save(analysisRecord);
@@ -169,6 +175,8 @@ public class S3UploadService {
                 record.originalFileName(),
                 record.fileSize(),
                 record.userId(),
+                record.latitude(),
+                record.longitude(),
                 record.aiAnalysis()
         );
     }

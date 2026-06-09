@@ -8,6 +8,8 @@ public record AlbumSummaryResponse(
         String objectUrl,
         String originalFileName,
         String userId,
+        Double latitude,
+        Double longitude,
         boolean defectFound,
         String defectType,
         int annotationCount

@@ -9,6 +9,8 @@ public record AlbumDetailResponse(
         String originalFileName,
         long fileSize,
         String userId,
+        Double latitude,
+        Double longitude,
         AiAnalysisResponse aiAnalysis,
         boolean defectFound,
         String defectType,

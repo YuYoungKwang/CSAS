@@ -9,6 +9,8 @@ public record AnalysisRecord(
         String originalFileName,
         long fileSize,
         String userId,
+        Double latitude,
+        Double longitude,
         AiAnalysisResponse aiAnalysis
 ) {
 }

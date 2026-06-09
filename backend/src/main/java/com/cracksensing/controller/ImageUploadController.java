@@ -27,8 +27,10 @@ public class ImageUploadController {
     @ResponseStatus(HttpStatus.CREATED)
     public AnalysisRecord uploadImage(
             @RequestParam("file") MultipartFile file,
-            @RequestParam("userId") String userId
+            @RequestParam("userId") String userId,
+            @RequestParam(value = "latitude", required = false) Double latitude,
+            @RequestParam(value = "longitude", required = false) Double longitude
     ) {
-        return s3UploadService.uploadImage(file, userId);
+        return s3UploadService.uploadImage(file, userId, latitude, longitude);
     }
 }

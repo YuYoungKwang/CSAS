@@ -72,6 +72,8 @@ public class AlbumQueryService {
                       originalFileName
                       fileSize
                       userId
+                      latitude
+                      longitude
                       aiAnalysisJson
                       defectFound
                       defectType
@@ -105,6 +107,8 @@ public class AlbumQueryService {
                       originalFileName
                       fileSize
                       userId
+                      latitude
+                      longitude
                       aiAnalysisJson
                       defectFound
                       defectType
@@ -160,6 +164,8 @@ public class AlbumQueryService {
                 getText(node, "originalFileName"),
                 node.path("fileSize").asLong(),
                 getText(node, "userId"),
+                getNullableDouble(node, "latitude"),
+                getNullableDouble(node, "longitude"),
                 parseAiAnalysis(aiAnalysisJson)
         );
     }
@@ -173,6 +179,8 @@ public class AlbumQueryService {
                 createPresignedUrl(record),
                 record.originalFileName(),
                 record.userId(),
+                record.latitude(),
+                record.longitude(),
                 AnalysisRecordSupport.getDefectFound(aiAnalysis),
                 AnalysisRecordSupport.getDefectType(aiAnalysis),
                 AnalysisRecordSupport.getAnnotationCount(aiAnalysis)
@@ -189,6 +197,8 @@ public class AlbumQueryService {
                 record.originalFileName(),
                 record.fileSize(),
                 record.userId(),
+                record.latitude(),
+                record.longitude(),
                 aiAnalysis,
                 AnalysisRecordSupport.getDefectFound(aiAnalysis),
                 AnalysisRecordSupport.getDefectType(aiAnalysis),
@@ -225,6 +235,11 @@ public class AlbumQueryService {
     private String getText(JsonNode node, String fieldName) {
         JsonNode value = node.path(fieldName);
         return value.isMissingNode() || value.isNull() ? "" : value.asText();
+    }
+
+    private Double getNullableDouble(JsonNode node, String fieldName) {
+        JsonNode value = node.path(fieldName);
+        return value.isMissingNode() || value.isNull() ? null : value.asDouble();
     }
 
     private String createPresignedUrl(AnalysisRecord record) {

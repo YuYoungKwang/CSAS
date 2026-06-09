@@ -3,6 +3,8 @@ import {
   ArrowLeft,
   Building2,
   Camera,
+  ChevronLeft,
+  ChevronRight,
   FolderSearch,
   ImageUp,
   Images,
@@ -44,6 +46,7 @@ const text = {
   defectTypes: '\uADE0\uC5F4 \uC885\uB958',
   analyzedAt: '\uBD84\uC11D \uC2DC\uAC04',
   coordinates: '\uC704\uCE58 \uC88C\uD45C',
+  locationUnavailable: '\uC704\uCE58 \uC815\uBCF4 \uC5C6\uC74C',
   confidence: '\uC2E0\uB8B0\uB3C4',
   ratio: '\uACB0\uD568 \uBA74\uC801\uBE44',
   albumTitle: '\uBD84\uC11D \uC568\uBC94',
@@ -135,23 +138,48 @@ function getUniqueAnnotationTypes(annotations = []) {
   return [...new Set(names)];
 }
 
-function formatPoint(point) {
-  const [x = 0, y = 0] = point ?? [];
-  return `(${x}, ${y})`;
-}
-
-function formatCoordinateSummary(points) {
-  if (!points.length) {
-    return '-';
-  }
-
-  const visiblePoints = points.slice(0, 8).map(formatPoint).join(' ');
-  return points.length > 8 ? `${visiblePoints} ... \uC678 ${points.length - 8}\uAC1C` : visiblePoints;
-}
-
 function getAnnotationColor(index) {
   const colors = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899'];
   return colors[index % colors.length];
+}
+
+function getAnnotationCenter(points, width, height) {
+  if (!points.length) {
+    return { x: 50, y: 50 };
+  }
+
+  const normalizedPoints = points.map((point) => normalizePoint(point, width, height));
+  const sum = normalizedPoints.reduce(
+    (total, point) => ({
+      x: total.x + point.x,
+      y: total.y + point.y,
+    }),
+    { x: 0, y: 0 }
+  );
+
+  return {
+    x: (sum.x / normalizedPoints.length / width) * 100,
+    y: (sum.y / normalizedPoints.length / height) * 100,
+  };
+}
+
+function getRecordLocation(record) {
+  const latitude = record?.latitude ?? record?.lat ?? record?.location?.latitude ?? record?.gps?.latitude;
+  const longitude = record?.longitude ?? record?.lng ?? record?.location?.longitude ?? record?.gps?.longitude;
+
+  if (typeof latitude !== 'number' || typeof longitude !== 'number') {
+    return null;
+  }
+
+  return { latitude, longitude };
+}
+
+function formatLocation(location) {
+  if (!location) {
+    return text.locationUnavailable;
+  }
+
+  return `${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}`;
 }
 
 function normalizePoint(point, width, height) {
@@ -166,12 +194,19 @@ function normalizePoint(point, width, height) {
 }
 
 function AnalysisImageViewer({ src, annotations = [], alt = '' }) {
-  const [split, setSplit] = useState(100);
+  const [activeSlide, setActiveSlide] = useState(0);
+  const [hoveredAnnotation, setHoveredAnnotation] = useState(null);
   const [imageSize, setImageSize] = useState({ width: 1, height: 1 });
   const hasAnnotations = annotations.length > 0;
+  const isAnalysisSlide = hasAnnotations && activeSlide === 1;
+
+  const toggleSlide = () => {
+    setActiveSlide((currentSlide) => (currentSlide === 0 ? 1 : 0));
+    setHoveredAnnotation(null);
+  };
 
   return (
-    <div className="analysis-viewer" style={{ '--split': `${split}%` }}>
+    <div className="analysis-viewer">
       <img
         alt={alt}
         className="analysis-image"
@@ -183,9 +218,8 @@ function AnalysisImageViewer({ src, annotations = [], alt = '' }) {
         }}
         src={src}
       />
-      {hasAnnotations && (
+      {isAnalysisSlide && (
         <div className="analysis-overlay">
-          <img alt="" className="analysis-image" src={src} />
           <svg aria-hidden="true" preserveAspectRatio="xMidYMid meet" viewBox={`0 0 ${imageSize.width} ${imageSize.height}`}>
             {annotations.map((annotation, index) => {
               const points = (annotation.points ?? []).map((point) => normalizePoint(point, imageSize.width, imageSize.height));
@@ -198,8 +232,21 @@ function AnalysisImageViewer({ src, annotations = [], alt = '' }) {
 
               return (
                 <g key={`${getAnnotationClassName(annotation)}-${index}`}>
-                  {points.length >= 3 && <polygon points={pointString} fill={color} opacity="0.18" />}
-                  <polyline points={pointString} fill="none" stroke={color} strokeLinecap="round" strokeLinejoin="round" strokeWidth="5" />
+                  {points.length >= 3 && (
+                    <polygon
+                      fill={color}
+                      onMouseEnter={() => setHoveredAnnotation({ annotation, index })}
+                      onMouseLeave={() => setHoveredAnnotation(null)}
+                      opacity="0.2"
+                      points={pointString}
+                    />
+                  )}
+                  <polyline
+                    onMouseEnter={() => setHoveredAnnotation({ annotation, index })}
+                    onMouseLeave={() => setHoveredAnnotation(null)}
+                    points={pointString}
+                    stroke={color}
+                  />
                   {points.map((point, pointIndex) => (
                     <circle cx={point.x} cy={point.y} fill={color} key={pointIndex} r="4" />
                   ))}
@@ -207,26 +254,45 @@ function AnalysisImageViewer({ src, annotations = [], alt = '' }) {
               );
             })}
           </svg>
+          {hoveredAnnotation && (
+            <span
+              className="annotation-tooltip"
+              style={{
+                '--tooltip-x': `${getAnnotationCenter(
+                  getAnnotationPoints(hoveredAnnotation.annotation),
+                  imageSize.width,
+                  imageSize.height
+                ).x}%`,
+                '--tooltip-y': `${getAnnotationCenter(
+                  getAnnotationPoints(hoveredAnnotation.annotation),
+                  imageSize.width,
+                  imageSize.height
+                ).y}%`,
+                '--tooltip-color': getAnnotationColor(hoveredAnnotation.index),
+              }}
+            >
+              {getAnnotationClassName(hoveredAnnotation.annotation)}
+            </span>
+          )}
         </div>
       )}
       {hasAnnotations && (
-        <div className="analysis-slider">
-          <span>원본</span>
-          <input
-            aria-label="분석 오버레이 표시 비율"
-            max="100"
-            min="0"
-            onChange={(event) => setSplit(Number(event.target.value))}
-            type="range"
-            value={split}
-          />
-          <span>분석</span>
-        </div>
+        <>
+          <button aria-label="원본 사진 보기" className="slide-arrow left" onClick={toggleSlide} type="button">
+            <ChevronLeft size={22} />
+          </button>
+          <button aria-label="분석 완료 사진 보기" className="slide-arrow right" onClick={toggleSlide} type="button">
+            <ChevronRight size={22} />
+          </button>
+          <div className="slide-status">
+            <span className={activeSlide === 0 ? 'active' : ''}>원본</span>
+            <span className={activeSlide === 1 ? 'active' : ''}>분석</span>
+          </div>
+        </>
       )}
     </div>
   );
 }
-
 function normalizeAlbumRecord(record) {
   const defectFound = record.defectFound ?? record.defect_found ?? getDefectSeverity(record.aiAnalysis) === 'danger';
   const severity = defectFound ? 'danger' : 'safe';
@@ -244,6 +310,8 @@ function normalizeAlbumRecord(record) {
     originalFileName: record.originalFileName,
     fileSize: record.fileSize,
     userId: record.userId,
+    latitude: record.latitude,
+    longitude: record.longitude,
     aiAnalysis: record.aiAnalysis,
     severity,
     severityLabel,
@@ -305,6 +373,7 @@ function App() {
   const [health, setHealth] = useState('checking');
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState('');
+  const [cameraLocation, setCameraLocation] = useState(null);
   const [uploadState, setUploadState] = useState('idle');
   const [analysis, setAnalysis] = useState(null);
   const [errorMessage, setErrorMessage] = useState('');
@@ -515,6 +584,8 @@ function App() {
   const cameraDefectTypes = getUniqueAnnotationTypes(cameraAnnotations);
   const selectedAlbumAnnotations = selectedAlbum?.aiAnalysis?.annotations ?? [];
   const selectedAlbumDefectTypes = getUniqueAnnotationTypes(selectedAlbumAnnotations);
+  const cameraDisplayLocation = getRecordLocation(analysis) ?? cameraLocation;
+  const selectedAlbumLocation = getRecordLocation(selectedAlbum);
 
   const handleSelectAlbum = async (item) => {
     setSelectedAlbum(item);
@@ -542,6 +613,7 @@ function App() {
     setAnalysis(null);
     setSelectedFile(null);
     setPreviewUrl('');
+    setCameraLocation(null);
     setUploadState('idle');
     setErrorMessage('');
     setAlbumItems([]);
@@ -566,6 +638,24 @@ function App() {
     setView(nextView);
   };
 
+  const requestCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      setCameraLocation(null);
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setCameraLocation({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        });
+      },
+      () => setCameraLocation(null),
+      { enableHighAccuracy: true, maximumAge: 60000, timeout: 5000 }
+    );
+  };
+
   const handleFileChange = (event) => {
     const file = event.target.files?.[0];
     setErrorMessage('');
@@ -579,6 +669,8 @@ function App() {
 
     setSelectedFile(file);
     setAnalysis(null);
+    setCameraLocation(null);
+    requestCurrentLocation();
   };
 
   const handleUpload = async () => {
@@ -595,12 +687,22 @@ function App() {
     const formData = new FormData();
     formData.append('file', selectedFile);
     formData.append('userId', currentUserId);
+    if (cameraLocation) {
+      formData.append('latitude', String(cameraLocation.latitude));
+      formData.append('longitude', String(cameraLocation.longitude));
+    }
     setUploadState('uploading');
     setErrorMessage('');
 
     try {
     const response = await api.post('/api/images/upload', formData);
-      const uploadedRecord = response.data ? normalizeAlbumRecord(response.data) : null;
+      const uploadedRecord = response.data
+        ? {
+            ...normalizeAlbumRecord(response.data),
+            latitude: response.data.latitude ?? cameraLocation?.latitude,
+            longitude: response.data.longitude ?? cameraLocation?.longitude,
+          }
+        : null;
 
       setAnalysis(uploadedRecord);
       setAlbumItems((items) => (uploadedRecord ? [uploadedRecord, ...items] : items));
@@ -611,8 +713,6 @@ function App() {
       setErrorMessage(text.uploadFailed);
     }
   };
-
-  const formatPercent = (value) => (typeof value === 'number' ? `${Math.round(value * 100)}%` : '-');
 
   return (
     <main className="phone-shell">
@@ -840,19 +940,9 @@ function App() {
               </div>
               <div>
                 <dt>{text.coordinates}</dt>
-                <dd>{cameraAnnotations.length > 0 ? `${cameraAnnotations.length}\uAC1C \uAC80\uCD9C` : '-'}</dd>
+                <dd>{formatLocation(cameraDisplayLocation)}</dd>
               </div>
             </dl>
-            {cameraAnnotations.length > 0 && (
-              <div className="coordinate-list">
-                {cameraAnnotations.map((annotation, index) => (
-                  <article className="coordinate-item" key={`${getAnnotationClassName(annotation)}-${index}`}>
-                    <strong>{getAnnotationClassName(annotation)}</strong>
-                    <span>{formatCoordinateSummary(getAnnotationPoints(annotation))}</span>
-                  </article>
-                ))}
-              </div>
-            )}
           </section>
         </section>
       )}
@@ -962,18 +1052,11 @@ function App() {
                   <dt>{text.analyzedAt}</dt>
                   <dd>{formatDate(selectedAlbum.savedAt)}</dd>
                 </div>
-              </dl>
-              {selectedAlbumAnnotations.length > 0 && (
-                <div className="coordinate-list">
-                  <h4>{text.coordinates}</h4>
-                  {selectedAlbumAnnotations.map((annotation, index) => (
-                    <article className="coordinate-item" key={`${getAnnotationClassName(annotation)}-${index}`}>
-                      <strong>{getAnnotationClassName(annotation)}</strong>
-                      <span>{formatCoordinateSummary(getAnnotationPoints(annotation))}</span>
-                    </article>
-                  ))}
+                <div>
+                  <dt>{text.coordinates}</dt>
+                  <dd>{formatLocation(selectedAlbumLocation)}</dd>
                 </div>
-              )}
+              </dl>
             </section>
           )}
         </section>

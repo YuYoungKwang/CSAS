@@ -1,9 +1,11 @@
 package com.cracksensing.service;
 
 import java.nio.charset.StandardCharsets;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import com.cracksensing.dto.AnalysisRecord;
@@ -81,12 +83,13 @@ public class WeaviateStorageService {
         }
 
         try {
-            restTemplate.exchange(
+            Map<?, ?> schema = restTemplate.exchange(
                     weaviateUrl + "/v1/schema/" + collectionName,
                     HttpMethod.GET,
                     new HttpEntity<>(createHeaders()),
                     Map.class
-            );
+            ).getBody();
+            ensureCollectionProperties(schema);
             collectionChecked = true;
         } catch (HttpClientErrorException exception) {
             if (exception.getStatusCode().value() != HttpStatus.NOT_FOUND.value()) {
@@ -113,12 +116,47 @@ public class WeaviateStorageService {
                         createProperty("originalFileName", "text"),
                         createProperty("fileSize", "int"),
                         createTextProperty("userId", "field"),
+                        createProperty("latitude", "number"),
+                        createProperty("longitude", "number"),
                         createProperty("aiAnalysisJson", "text"),
                         createProperty("defectFound", "boolean"),
                         createProperty("defectType", "text"),
                         createProperty("annotationCount", "int")
                 )
         );
+    }
+
+    private void ensureCollectionProperties(Map<?, ?> schema) {
+        if (schema == null) {
+            return;
+        }
+
+        Set<String> existingProperties = new HashSet<>();
+        Object properties = schema.get("properties");
+        if (properties instanceof List<?> propertyList) {
+            for (Object property : propertyList) {
+                if (property instanceof Map<?, ?> propertyMap && propertyMap.get("name") instanceof String name) {
+                    existingProperties.add(name);
+                }
+            }
+        }
+
+        addPropertyIfMissing(existingProperties, createProperty("latitude", "number"));
+        addPropertyIfMissing(existingProperties, createProperty("longitude", "number"));
+    }
+
+    private void addPropertyIfMissing(Set<String> existingProperties, Map<String, Object> property) {
+        String propertyName = (String) property.get("name");
+        if (existingProperties.contains(propertyName)) {
+            return;
+        }
+
+        restTemplate.postForEntity(
+                weaviateUrl + "/v1/schema/" + collectionName + "/properties",
+                new HttpEntity<>(property, createHeaders()),
+                Map.class
+        );
+        existingProperties.add(propertyName);
     }
 
     private Map<String, Object> createProperty(String name, String dataType) {
@@ -144,6 +182,12 @@ public class WeaviateStorageService {
         properties.put("originalFileName", record.originalFileName());
         properties.put("fileSize", record.fileSize());
         properties.put("userId", record.userId());
+        if (record.latitude() != null) {
+            properties.put("latitude", record.latitude());
+        }
+        if (record.longitude() != null) {
+            properties.put("longitude", record.longitude());
+        }
         properties.put("aiAnalysisJson", record.aiAnalysis() == null ? "" : objectMapper.writeValueAsString(record.aiAnalysis()));
         properties.put("defectFound", AnalysisRecordSupport.getDefectFound(record.aiAnalysis()));
         properties.put("defectType", AnalysisRecordSupport.getDefectType(record.aiAnalysis()));
