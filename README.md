@@ -169,7 +169,8 @@ Create the backend runtime secret before applying manifests. Do not commit real 
 ```powershell
 kubectl create secret generic backend-secrets `
   --from-literal=S3_BUCKET_NAME=replace-me `
-  --from-literal=GOOGLE_CLIENT_ID=replace-me
+  --from-literal=GOOGLE_CLIENT_ID=replace-me `
+  --from-literal=WEAVIATE_API_KEY=replace-me
 ```
 
 If the secret already exists, update it with the real values or delete and recreate it.
@@ -178,10 +179,40 @@ If the secret already exists, update it with the real values or delete and recre
 
 ```powershell
 kubectl apply -f k8s/
+kubectl rollout status statefulset/weaviate
 kubectl rollout status deployment/backend
 kubectl rollout status deployment/frontend
 kubectl rollout status deployment/python
 ```
+
+### Weaviate
+
+Weaviate is deployed from `k8s/weaviate.yaml` and is accessed by the backend through the internal Kubernetes service `http://weaviate:8080`.
+
+- Kubernetes resource: `StatefulSet/weaviate`
+- Collection name used by backend: `CrackAnalysis`
+- Storage: `20Gi` EBS PVC using the current `gp2` StorageClass
+- Auth: API key through `backend-secrets.WEAVIATE_API_KEY`
+- External exposure: none. The service is `ClusterIP`.
+
+Generate an API key value:
+
+```powershell
+-join ((48..57 + 65..90 + 97..122) | Get-Random -Count 48 | ForEach-Object {[char]$_})
+```
+
+Check Weaviate from inside EKS:
+
+```powershell
+kubectl get pods,svc,pvc -l app=weaviate
+
+kubectl run weaviate-curl --rm -i --restart=Never `
+  --image=curlimages/curl:8.15.0 `
+  --env="WEAVIATE_API_KEY=replace-me" `
+  --command -- sh -c 'curl -sS -H "Authorization: Bearer $WEAVIATE_API_KEY" http://weaviate:8080/v1/meta'
+```
+
+The current `gp2` StorageClass has `AllowVolumeExpansion: false`. The PVC starts at `20Gi` because growing this volume later would require migration or a new expandable StorageClass.
 
 ### GitHub Actions
 
@@ -211,13 +242,12 @@ Required GitHub Secrets:
 - `AWS_SECRET_ACCESS_KEY`
 - `S3_BUCKET_NAME`
 - `GOOGLE_CLIENT_ID`
+- `WEAVIATE_API_KEY`
 
 `GOOGLE_CLIENT_ID` is used twice in GitHub Actions:
 
 - As `VITE_GOOGLE_CLIENT_ID` during the frontend Docker build. Vite embeds this value into the browser bundle.
 - As `GOOGLE_CLIENT_ID` in the backend Kubernetes Secret so the backend can validate Google token audience.
-
-Weaviate is deployed from `k8s/weaviate.yaml` and is accessed by the backend through the internal Kubernetes service `http://weaviate:8080`.
 
 ### Add GitHub Secrets
 
@@ -236,6 +266,7 @@ AWS_ACCESS_KEY_ID
 AWS_SECRET_ACCESS_KEY
 S3_BUCKET_NAME
 GOOGLE_CLIENT_ID
+WEAVIATE_API_KEY
 ```
 
 Example values:
@@ -243,4 +274,5 @@ Example values:
 ```text
 S3_BUCKET_NAME=cracksensing-images-dev
 GOOGLE_CLIENT_ID=your-google-oauth-client-id.apps.googleusercontent.com
+WEAVIATE_API_KEY=your-long-random-weaviate-api-key
 ```

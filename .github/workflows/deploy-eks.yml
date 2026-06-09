@@ -57,18 +57,22 @@ jobs:
         env:
           S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME }}
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          WEAVIATE_API_KEY: ${{ secrets.WEAVIATE_API_KEY }}
         run: |
           test -n "$S3_BUCKET_NAME"
           test -n "$GOOGLE_CLIENT_ID"
+          test -n "$WEAVIATE_API_KEY"
 
       - name: Apply runtime secrets
         env:
           S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME }}
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          WEAVIATE_API_KEY: ${{ secrets.WEAVIATE_API_KEY }}
         run: |
           kubectl create secret generic backend-secrets \
             --from-literal=S3_BUCKET_NAME="$S3_BUCKET_NAME" \
             --from-literal=GOOGLE_CLIENT_ID="$GOOGLE_CLIENT_ID" \
+            --from-literal=WEAVIATE_API_KEY="$WEAVIATE_API_KEY" \
             --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Apply Kubernetes manifests

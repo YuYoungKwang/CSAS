@@ -5,7 +5,12 @@ metadata:
   labels:
     app: frontend
 spec:
-  replicas: 2
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
   selector:
     matchLabels:
       app: frontend
@@ -16,7 +21,7 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: 533267330483.dkr.ecr.ap-northeast-2.amazonaws.com/csas-frontend:v1
+          image: 533267330483.dkr.ecr.ap-northeast-2.amazonaws.com/csas-frontend:22d3dee-13-1
           imagePullPolicy: Always
           ports:
             - containerPort: 80
