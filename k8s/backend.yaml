@@ -5,7 +5,12 @@ metadata:
   labels:
     app: backend
 spec:
-  replicas: 2
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
   selector:
     matchLabels:
       app: backend
@@ -16,7 +21,7 @@ spec:
     spec:
       containers:
         - name: backend
-          image: 533267330483.dkr.ecr.ap-northeast-2.amazonaws.com/csas-backend:v1
+          image: 533267330483.dkr.ecr.ap-northeast-2.amazonaws.com/csas-backend:22d3dee-13-1
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
@@ -32,7 +37,10 @@ spec:
             - name: WEAVIATE_COLLECTION
               value: CrackAnalysis
             - name: WEAVIATE_API_KEY
-              value: ""
+              valueFrom:
+                secretKeyRef:
+                  name: backend-secrets
+                  key: WEAVIATE_API_KEY
             - name: S3_BUCKET_NAME
               valueFrom:
                 secretKeyRef:
