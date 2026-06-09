@@ -109,6 +109,21 @@ function getDefectLabel(aiAnalysis) {
   return firstAnnotation?.class_name ?? firstAnnotation?.className ?? text.danger;
 }
 
+function getRecordDefectLabels(record) {
+  const labels = [
+    record.defectType,
+    ...(record.aiAnalysis?.annotations ?? []).map((annotation) => annotation?.class_name ?? annotation?.className),
+  ]
+    .filter(Boolean)
+    .map((label) => String(label).trim().toLowerCase());
+
+  if (labels.length === 0 && record.severity === 'safe') {
+    return ['normal', 'safe', '정상', '양호'];
+  }
+
+  return labels;
+}
+
 function normalizeAlbumRecord(record) {
   const defectFound = record.defectFound ?? record.defect_found ?? getDefectSeverity(record.aiAnalysis) === 'danger';
   const severity = defectFound ? 'danger' : 'safe';
@@ -365,10 +380,10 @@ function App() {
       return true;
     }
 
-    const itemDefectType = String(item.defectType ?? '').trim().toLowerCase();
-    return selectedDefectTypes.some((selectedValue) => {
+    const itemDefectLabels = getRecordDefectLabels(item);
+    return selectedDefectTypes.every((selectedValue) => {
       const option = defectTypeOptions.find((defectType) => defectType.value === selectedValue);
-      return option?.aliases.some((alias) => itemDefectType === alias.toLowerCase()) ?? false;
+      return option?.aliases.some((alias) => itemDefectLabels.includes(alias.toLowerCase())) ?? false;
     });
   }).sort((first, second) => {
     if (activeFilter === 'recent') {
