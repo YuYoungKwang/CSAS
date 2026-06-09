@@ -20,7 +20,6 @@ import org.slf4j.LoggerFactory;
 import com.cracksensing.dto.AnalysisRecord;
 import com.cracksensing.dto.AiAnalysisResponse;
 import com.cracksensing.exception.InvalidImageFileException;
-import com.cracksensing.exception.OpenSearchStorageException;
 import com.cracksensing.exception.S3UploadException;
 
 import software.amazon.awssdk.core.sync.RequestBody;
@@ -43,7 +42,7 @@ public class S3UploadService {
 
     private final S3Client s3Client;
     private final AiAnalysisClient aiAnalysisClient;
-    private final OpenSearchStorageService openSearchStorageService;
+    private final WeaviateStorageService weaviateStorageService;
     private final S3PresignedUrlService s3PresignedUrlService;
     private final String bucketName;
     private final String awsRegion;
@@ -51,14 +50,14 @@ public class S3UploadService {
     public S3UploadService(
             S3Client s3Client,
             AiAnalysisClient aiAnalysisClient,
-            OpenSearchStorageService openSearchStorageService,
+            WeaviateStorageService weaviateStorageService,
             S3PresignedUrlService s3PresignedUrlService,
             @Value("${s3.bucket-name}") String bucketName,
             @Value("${aws.region}") String awsRegion
     ) {
         this.s3Client = s3Client;
         this.aiAnalysisClient = aiAnalysisClient;
-        this.openSearchStorageService = openSearchStorageService;
+        this.weaviateStorageService = weaviateStorageService;
         this.s3PresignedUrlService = s3PresignedUrlService;
         this.bucketName = bucketName;
         this.awsRegion = awsRegion;
@@ -108,18 +107,7 @@ public class S3UploadService {
                 userId,
                 aiAnalysis
         );
-        AnalysisRecord storedRecord;
-        try {
-            storedRecord = openSearchStorageService.save(analysisRecord);
-        } catch (OpenSearchStorageException exception) {
-            log.error(
-                    "Image uploaded to S3, but failed to save analysis record to OpenSearch. objectKey={}, objectUrl={}",
-                    objectKey,
-                    objectUrl,
-                    exception
-            );
-            storedRecord = analysisRecord;
-        }
+        AnalysisRecord storedRecord = weaviateStorageService.save(analysisRecord);
 
         return withPresignedUrl(storedRecord);
     }

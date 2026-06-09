@@ -12,11 +12,10 @@ aws:
 s3:
   bucket-name: ${S3_BUCKET_NAME}
 
-opensearch:
-  endpoint: ${OPENSEARCH_ENDPOINT:}
-  region: ${OPENSEARCH_REGION:ap-northeast-2}
-  service: ${OPENSEARCH_SERVICE:es}
-  index-name: ${OPENSEARCH_INDEX_NAME:crack-analysis-results}
+weaviate:
+  url: ${WEAVIATE_URL:}
+  api-key: ${WEAVIATE_API_KEY:}
+  collection: ${WEAVIATE_COLLECTION:CrackAnalysis}
 
 ai:
   base-url: ${AI_BASE_URL:}

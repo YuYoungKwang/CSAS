@@ -27,25 +27,17 @@ spec:
               value: http://python:8000
             - name: AI_ANALYZE_PATH
               value: /api/analyze
-            - name: OPENSEARCH_SERVICE
-              value: es
-            - name: OPENSEARCH_INDEX_NAME
-              value: crack-analysis-results
+            - name: WEAVIATE_URL
+              value: http://weaviate:8080
+            - name: WEAVIATE_COLLECTION
+              value: CrackAnalysis
+            - name: WEAVIATE_API_KEY
+              value: ""
             - name: S3_BUCKET_NAME
               valueFrom:
                 secretKeyRef:
                   name: backend-secrets
                   key: S3_BUCKET_NAME
-            - name: OPENSEARCH_ENDPOINT
-              valueFrom:
-                secretKeyRef:
-                  name: backend-secrets
-                  key: OPENSEARCH_ENDPOINT
-            - name: OPENSEARCH_REGION
-              valueFrom:
-                secretKeyRef:
-                  name: backend-secrets
-                  key: OPENSEARCH_REGION
             - name: GOOGLE_CLIENT_ID
               valueFrom:
                 secretKeyRef:

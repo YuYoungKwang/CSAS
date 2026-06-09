@@ -1,96 +1,171 @@
 package com.cracksensing.service;
 
+import java.time.Instant;
+import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
+import com.cracksensing.dto.AiAnalysisResponse;
 import com.cracksensing.dto.AlbumDetailResponse;
 import com.cracksensing.dto.AlbumSummaryResponse;
 import com.cracksensing.dto.AnalysisRecord;
-import com.cracksensing.dto.AiAnalysisResponse;
-import com.cracksensing.dto.AiAnnotation;
-
-import org.opensearch.client.opensearch.OpenSearchClient;
-import org.opensearch.client.opensearch.core.GetResponse;
-import org.opensearch.client.opensearch._types.FieldValue;
-import org.opensearch.client.opensearch._types.SortOrder;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.web.client.RestTemplateBuilder;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
+import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestTemplate;
 
 @Service
 public class AlbumQueryService {
 
     private static final Logger log = LoggerFactory.getLogger(AlbumQueryService.class);
 
-    private final OpenSearchClient openSearchClient;
+    private final RestTemplate restTemplate;
+    private final ObjectMapper objectMapper;
     private final S3PresignedUrlService s3PresignedUrlService;
-    private final String indexName;
+    private final String weaviateUrl;
+    private final String apiKey;
+    private final String collectionName;
 
     public AlbumQueryService(
-            ObjectProvider<OpenSearchClient> openSearchClientProvider,
+            RestTemplateBuilder restTemplateBuilder,
+            ObjectMapper objectMapper,
             S3PresignedUrlService s3PresignedUrlService,
-            @Value("${opensearch.index-name:crack-analysis-results}") String indexName
+            @Value("${weaviate.url:}") String weaviateUrl,
+            @Value("${weaviate.api-key:}") String apiKey,
+            @Value("${weaviate.collection:CrackAnalysis}") String collectionName
     ) {
-        this.openSearchClient = openSearchClientProvider.getIfAvailable();
+        this.restTemplate = restTemplateBuilder.build();
+        this.objectMapper = objectMapper;
         this.s3PresignedUrlService = s3PresignedUrlService;
-        this.indexName = indexName;
+        this.weaviateUrl = normalizeUrl(weaviateUrl);
+        this.apiKey = apiKey;
+        this.collectionName = collectionName;
     }
 
     public AlbumDetailResponse findByObjectKey(String objectKey) {
-        if (openSearchClient == null) {
-            log.warn("OpenSearch is not configured. Album detail lookup is unavailable. objectKey={}", objectKey);
+        if (!isConfigured()) {
+            log.warn("Weaviate is not configured. Album detail lookup is unavailable. objectKey={}", objectKey);
             return null;
         }
 
-        try {
-            GetResponse<AnalysisRecord> response = openSearchClient.get(
-                    getRequest -> getRequest.index(indexName).id(objectKey),
-                    AnalysisRecord.class
-            );
+        String query = """
+                {
+                  Get {
+                    %s(
+                      where: {path: ["objectKey"], operator: Equal, valueText: "%s"}
+                      limit: 1
+                    ) {
+                      objectKey
+                      savedAt
+                      objectUrl
+                      originalFileName
+                      fileSize
+                      userId
+                      aiAnalysisJson
+                      defectFound
+                      defectType
+                      annotationCount
+                    }
+                  }
+                }
+                """.formatted(collectionName, escapeGraphqlString(objectKey));
 
-            return response.found() && response.source() != null ? toDetailResponse(response.source()) : null;
-        } catch (Exception exception) {
-            log.error("Failed to fetch album detail from OpenSearch. objectKey={}, indexName={}", objectKey, indexName, exception);
-            return null;
-        }
+        List<AnalysisRecord> records = executeQuery(query);
+        return records.isEmpty() ? null : toDetailResponse(records.get(0));
     }
 
     public List<AlbumSummaryResponse> findByUserId(String userId, int limit) {
-        if (openSearchClient == null) {
-            log.warn("OpenSearch is not configured. Album list lookup is unavailable. userId={}", userId);
+        if (!isConfigured()) {
+            log.warn("Weaviate is not configured. Album list lookup is unavailable. userId={}", userId);
             return List.of();
         }
 
+        String query = """
+                {
+                  Get {
+                    %s(
+                      where: {path: ["userId"], operator: Equal, valueText: "%s"}
+                      sort: [{path: ["savedAt"], order: desc}]
+                      limit: %d
+                    ) {
+                      objectKey
+                      savedAt
+                      objectUrl
+                      originalFileName
+                      fileSize
+                      userId
+                      aiAnalysisJson
+                      defectFound
+                      defectType
+                      annotationCount
+                    }
+                  }
+                }
+                """.formatted(collectionName, escapeGraphqlString(userId), limit);
+
+        return executeQuery(query).stream()
+                .map(this::toSummaryResponse)
+                .toList();
+    }
+
+    private List<AnalysisRecord> executeQuery(String query) {
         try {
-            return openSearchClient.search(search -> search
-                            .index(indexName)
-                            .size(limit)
-                            .query(query -> query.term(term -> term
-                                    .field("userId")
-                                    .value(FieldValue.of(userId))
-                            ))
-                            .sort(sort -> sort.field(field -> field
-                                    .field("savedAt")
-                                    .order(SortOrder.Desc)
-                            )),
-                    AnalysisRecord.class
-            ).hits().hits().stream()
-                    .map(hit -> hit.source())
-                    .filter(record -> record != null)
-                    .map(this::toSummaryResponse)
-                    .toList();
-        } catch (Exception exception) {
-            log.error("Failed to fetch album list from OpenSearch. userId={}, indexName={}", userId, indexName, exception);
+            JsonNode response = restTemplate.postForObject(
+                    weaviateUrl + "/v1/graphql",
+                    new HttpEntity<>(Map.of("query", query), createHeaders()),
+                    JsonNode.class
+            );
+
+            if (response == null) {
+                return List.of();
+            }
+
+            JsonNode errors = response.path("errors");
+            if (errors.isArray() && !errors.isEmpty()) {
+                log.error("Weaviate GraphQL query failed. errors={}", errors);
+                return List.of();
+            }
+
+            JsonNode items = response.path("data").path("Get").path(collectionName);
+            if (!items.isArray()) {
+                return List.of();
+            }
+
+            List<AnalysisRecord> records = new ArrayList<>();
+            items.forEach(item -> records.add(toAnalysisRecord(item)));
+            return records;
+        } catch (RestClientException exception) {
+            log.error("Failed to fetch album records from Weaviate. collectionName={}", collectionName, exception);
             return List.of();
         }
+    }
+
+    private AnalysisRecord toAnalysisRecord(JsonNode node) {
+        String aiAnalysisJson = getText(node, "aiAnalysisJson");
+        return new AnalysisRecord(
+                getText(node, "objectKey"),
+                parseInstant(getText(node, "savedAt")),
+                getText(node, "objectUrl"),
+                getText(node, "originalFileName"),
+                node.path("fileSize").asLong(),
+                getText(node, "userId"),
+                parseAiAnalysis(aiAnalysisJson)
+        );
     }
 
     private AlbumSummaryResponse toSummaryResponse(AnalysisRecord record) {
         AiAnalysisResponse aiAnalysis = record.aiAnalysis();
-        boolean defectFound = getDefectFound(aiAnalysis);
-        String defectType = getDefectType(aiAnalysis);
-        int annotationCount = getAnnotationCount(aiAnalysis);
 
         return new AlbumSummaryResponse(
                 record.objectKey(),
@@ -98,17 +173,14 @@ public class AlbumQueryService {
                 createPresignedUrl(record),
                 record.originalFileName(),
                 record.userId(),
-                defectFound,
-                defectType,
-                annotationCount
+                AnalysisRecordSupport.getDefectFound(aiAnalysis),
+                AnalysisRecordSupport.getDefectType(aiAnalysis),
+                AnalysisRecordSupport.getAnnotationCount(aiAnalysis)
         );
     }
 
     private AlbumDetailResponse toDetailResponse(AnalysisRecord record) {
         AiAnalysisResponse aiAnalysis = record.aiAnalysis();
-        boolean defectFound = getDefectFound(aiAnalysis);
-        String defectType = getDefectType(aiAnalysis);
-        int annotationCount = getAnnotationCount(aiAnalysis);
 
         return new AlbumDetailResponse(
                 record.objectKey(),
@@ -118,31 +190,70 @@ public class AlbumQueryService {
                 record.fileSize(),
                 record.userId(),
                 aiAnalysis,
-                defectFound,
-                defectType,
-                annotationCount
+                AnalysisRecordSupport.getDefectFound(aiAnalysis),
+                AnalysisRecordSupport.getDefectType(aiAnalysis),
+                AnalysisRecordSupport.getAnnotationCount(aiAnalysis)
         );
     }
 
-    private boolean getDefectFound(AiAnalysisResponse aiAnalysis) {
-        return aiAnalysis != null && Boolean.TRUE.equals(aiAnalysis.defectFound());
-    }
-
-    private String getDefectType(AiAnalysisResponse aiAnalysis) {
-        if (aiAnalysis == null || aiAnalysis.annotations() == null || aiAnalysis.annotations().isEmpty()) {
-            return "SAFE";
+    private AiAnalysisResponse parseAiAnalysis(String aiAnalysisJson) {
+        if (!StringUtils.hasText(aiAnalysisJson)) {
+            return null;
         }
 
-        AiAnnotation firstAnnotation = aiAnalysis.annotations().get(0);
-        return firstAnnotation != null && firstAnnotation.className() != null ? firstAnnotation.className() : "SAFE";
+        try {
+            return objectMapper.readValue(aiAnalysisJson, AiAnalysisResponse.class);
+        } catch (JsonProcessingException exception) {
+            log.warn("Failed to parse AI analysis JSON from Weaviate. aiAnalysisJson={}", aiAnalysisJson, exception);
+            return null;
+        }
     }
 
-    private int getAnnotationCount(AiAnalysisResponse aiAnalysis) {
-        return aiAnalysis == null || aiAnalysis.annotations() == null ? 0 : aiAnalysis.annotations().size();
+    private Instant parseInstant(String value) {
+        if (!StringUtils.hasText(value)) {
+            return Instant.EPOCH;
+        }
+
+        try {
+            return Instant.parse(value);
+        } catch (DateTimeParseException exception) {
+            log.warn("Invalid savedAt value from Weaviate. savedAt={}", value, exception);
+            return Instant.EPOCH;
+        }
+    }
+
+    private String getText(JsonNode node, String fieldName) {
+        JsonNode value = node.path(fieldName);
+        return value.isMissingNode() || value.isNull() ? "" : value.asText();
     }
 
     private String createPresignedUrl(AnalysisRecord record) {
         String presignedUrl = s3PresignedUrlService.createReadUrl(record.objectKey());
         return presignedUrl != null ? presignedUrl : record.objectUrl();
+    }
+
+    private HttpHeaders createHeaders() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        if (StringUtils.hasText(apiKey)) {
+            headers.setBearerAuth(apiKey);
+        }
+        return headers;
+    }
+
+    private boolean isConfigured() {
+        return StringUtils.hasText(weaviateUrl) && StringUtils.hasText(collectionName);
+    }
+
+    private String normalizeUrl(String url) {
+        if (!StringUtils.hasText(url)) {
+            return "";
+        }
+
+        return url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
+    }
+
+    private String escapeGraphqlString(String value) {
+        return value.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 }

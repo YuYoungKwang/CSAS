@@ -22,13 +22,14 @@ services:
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
       - AWS_REGION=${AWS_REGION:-ap-northeast-2}
       - S3_BUCKET_NAME=${S3_BUCKET_NAME:-csas-local-dev}
-      - OPENSEARCH_ENDPOINT=${OPENSEARCH_ENDPOINT}
-      - OPENSEARCH_REGION=${OPENSEARCH_REGION:-ap-northeast-2}
-      - OPENSEARCH_SERVICE=${OPENSEARCH_SERVICE:-es}
-      - OPENSEARCH_INDEX_NAME=${OPENSEARCH_INDEX_NAME:-crack-analysis-results}
+      - WEAVIATE_URL=http://weaviate:8080
+      - WEAVIATE_API_KEY=${WEAVIATE_API_KEY:-}
+      - WEAVIATE_COLLECTION=${WEAVIATE_COLLECTION:-CrackAnalysis}
       - AI_BASE_URL=http://python:8000
       - AI_ANALYZE_PATH=/api/analyze
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-${VITE_GOOGLE_CLIENT_ID:-}}
+    depends_on:
+      - weaviate
 
   python:
     build:
@@ -36,3 +37,19 @@ services:
       dockerfile: Dockerfile.dev
     ports:
       - "8000:8000"
+
+  weaviate:
+    image: semitechnologies/weaviate:1.25.7
+    ports:
+      - "8081:8080"
+    environment:
+      - QUERY_DEFAULTS_LIMIT=25
+      - AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED=true
+      - PERSISTENCE_DATA_PATH=/var/lib/weaviate
+      - DEFAULT_VECTORIZER_MODULE=none
+      - CLUSTER_HOSTNAME=node1
+    volumes:
+      - weaviate-data:/var/lib/weaviate
+
+volumes:
+  weaviate-data:
