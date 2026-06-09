@@ -298,7 +298,7 @@ button {
   gap: 20px;
   height: 100vh;
   overflow-y: auto;
-  padding: 92px 22px 28px;
+  padding: 92px 22px 44px;
   background:
     linear-gradient(90deg, rgba(85, 112, 59, 0.12) 1px, transparent 1px),
     linear-gradient(0deg, rgba(85, 112, 59, 0.1) 1px, transparent 1px),
@@ -401,6 +401,14 @@ button {
     #fff7d8;
   background-size: 18px 18px;
   box-shadow: 0 8px 0 #20371d;
+}
+
+.camera-screen {
+  padding-bottom: 72px;
+}
+
+.camera-screen .result-card {
+  margin-bottom: 12px;
 }
 
 .login-form input,
@@ -595,20 +603,32 @@ dd {
 
 .filter-row {
   display: flex;
+  align-items: center;
   gap: 8px;
   overflow-x: auto;
-  padding-bottom: 2px;
+  overflow-y: hidden;
+  width: 100%;
+  min-height: 52px;
+  min-width: 0;
+  padding: 0 0 12px;
+  scrollbar-width: thin;
 }
 
 .filter-row button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex: 0 0 auto;
-  min-height: 38px;
+  height: 40px;
+  min-width: 64px;
   border: 3px solid #20371d;
   border-radius: 0;
   padding: 0 14px;
   background: #d6cf8b;
   color: #263022;
   font-weight: 900;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .filter-row button.active {
@@ -620,6 +640,7 @@ dd {
 .album-list {
   display: grid;
   gap: 12px;
+  min-width: 0;
 }
 
 .album-item {
@@ -627,6 +648,7 @@ dd {
   grid-template-columns: 72px minmax(0, 1fr) auto;
   gap: 12px;
   align-items: center;
+  min-width: 0;
   border: 4px solid #20371d;
   border-radius: 0;
   padding: 12px;
@@ -649,6 +671,7 @@ dd {
   border-radius: 0;
   background: #c8c8af;
   color: #263022;
+  flex: 0 0 auto;
   overflow: hidden;
 }
 
@@ -710,6 +733,9 @@ dd {
 }
 
 .album-item em {
+  max-width: 58px;
+  text-align: center;
+  white-space: nowrap;
   border: 2px solid #20371d;
   border-radius: 0;
   padding: 6px 9px;
