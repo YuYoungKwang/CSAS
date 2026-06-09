@@ -169,17 +169,7 @@ Create the backend runtime secret before applying manifests. Do not commit real 
 ```powershell
 kubectl create secret generic backend-secrets `
   --from-literal=S3_BUCKET_NAME=replace-me `
-  --from-literal=OPENSEARCH_ENDPOINT=replace-me `
-  --from-literal=OPENSEARCH_REGION=ap-northeast-2 `
   --from-literal=GOOGLE_CLIENT_ID=replace-me
-```
-
-Store the OpenSearch master account separately. The backend application does not read this secret directly.
-
-```powershell
-kubectl create secret generic opensearch-master-secrets `
-  --from-literal=OPENSEARCH_MASTER_USERNAME=replace-me `
-  --from-literal=OPENSEARCH_MASTER_PASSWORD=replace-me
 ```
 
 If the secret already exists, update it with the real values or delete and recreate it.
@@ -220,18 +210,14 @@ Required GitHub Secrets:
 - `AWS_ACCESS_KEY_ID`
 - `AWS_SECRET_ACCESS_KEY`
 - `S3_BUCKET_NAME`
-- `OPENSEARCH_ENDPOINT`
-- `OPENSEARCH_REGION`
 - `GOOGLE_CLIENT_ID`
-- `OPENSEARCH_MASTER_USERNAME`
-- `OPENSEARCH_MASTER_PASSWORD`
 
 `GOOGLE_CLIENT_ID` is used twice in GitHub Actions:
 
 - As `VITE_GOOGLE_CLIENT_ID` during the frontend Docker build. Vite embeds this value into the browser bundle.
 - As `GOOGLE_CLIENT_ID` in the backend Kubernetes Secret so the backend can validate Google token audience.
 
-The OpenSearch master username and password are stored in `opensearch-master-secrets` for admin tasks such as OpenSearch Security role mapping. They are not injected into the backend container by default.
+Weaviate is deployed from `k8s/weaviate.yaml` and is accessed by the backend through the internal Kubernetes service `http://weaviate:8080`.
 
 ### Add GitHub Secrets
 
@@ -249,20 +235,12 @@ Use these names:
 AWS_ACCESS_KEY_ID
 AWS_SECRET_ACCESS_KEY
 S3_BUCKET_NAME
-OPENSEARCH_ENDPOINT
-OPENSEARCH_REGION
 GOOGLE_CLIENT_ID
-OPENSEARCH_MASTER_USERNAME
-OPENSEARCH_MASTER_PASSWORD
 ```
 
 Example values:
 
 ```text
 S3_BUCKET_NAME=cracksensing-images-dev
-OPENSEARCH_ENDPOINT=https://vpc-crack-search-dev-ttr3jmyc5453vmwzghbvns5nmu.ap-northeast-2.es.amazonaws.com
-OPENSEARCH_REGION=ap-northeast-2
 GOOGLE_CLIENT_ID=your-google-oauth-client-id.apps.googleusercontent.com
-OPENSEARCH_MASTER_USERNAME=your-opensearch-master-user
-OPENSEARCH_MASTER_PASSWORD=your-opensearch-master-password
 ```
