@@ -16,7 +16,7 @@ const text = {
   subtitle: 'AI \uAE30\uBC18 \uC678\uAD00 \uC810\uAC80\uACFC \uBD84\uC11D \uAE30\uB85D \uAD00\uB9AC',
   login: '\uB85C\uADF8\uC778',
   logout: '\uB85C\uADF8\uC544\uC6C3',
-  loginTitle: '\uAD6C\uAE00 \uB85C\uADF8\uC778',
+  loginTitle: 'Google \uB85C\uADF8\uC778',
   loginHint: '\uAD6C\uAE00 \uACC4\uC815\uC73C\uB85C \uC778\uC99D\uD558\uBA74 \uC568\uBC94\uACFC \uC5C5\uB85C\uB4DC\uC5D0 \uD3EC\uD568\uD560 \uC0AC\uC6A9\uC790 \uC815\uBCF4\uB97C \uAD6C\uBD84\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.',
   loginAction: '\uAD6C\uAE00\uC73C\uB85C \uB85C\uADF8\uC778',
   loginReady: '\uB85C\uADF8\uC778 \uC644\uB8CC',
@@ -53,6 +53,9 @@ const text = {
   search: '\uAC80\uC0C9',
   searchPlaceholder: '\uC704\uCE58, \uACB0\uD568 \uC720\uD615, \uBA54\uBAA8 \uAC80\uC0C9',
   all: '\uC804\uCCB4',
+  recent: '\uCD5C\uADFC',
+  sortName: '\uC774\uB984',
+  sortDefectType: '\uADE0\uC5F4\uC885\uB958',
   safe: '\uC591\uD638',
   watch: '\uC8FC\uC758',
   alert: '\uACBD\uACC4',
@@ -63,10 +66,23 @@ const text = {
 
 const filters = [
   { value: 'all', label: text.all },
-  { value: 'safe', label: text.safe },
-  { value: 'watch', label: text.watch },
-  { value: 'alert', label: text.alert },
-  { value: 'danger', label: text.danger },
+  { value: 'recent', label: text.recent },
+  { value: 'name', label: text.sortName },
+  { value: 'defectType', label: text.sortDefectType },
+];
+
+const defectTypeOptions = [
+  { value: 'normal', label: '정상', aliases: ['정상', '양호', 'safe', 'normal'] },
+  { value: 'crack', label: '균열', aliases: ['균열', 'crack', 'damage'] },
+  { value: 'leakage', label: '누수', aliases: ['누수', 'leak', 'leakage'] },
+  { value: 'efflorescence', label: '백태', aliases: ['백태', 'efflorescence'] },
+  { value: 'peeling', label: '박리', aliases: ['박리', 'peeling'] },
+  { value: 'spalling', label: '박락', aliases: ['박락', 'spalling'] },
+  { value: 'rebar', label: '철근노출', aliases: ['철근노출', 'rebar', 'rebar exposure'] },
+  { value: 'contamination', label: '오염', aliases: ['오염', 'contamination', 'stain'] },
+  { value: 'breakage', label: '파손', aliases: ['파손', 'breakage', 'broken'] },
+  { value: 'delamination', label: '들뜸', aliases: ['들뜸', 'delamination'] },
+  { value: 'other', label: '기타', aliases: ['기타', 'other'] },
 ];
 
 function formatDate(value) {
@@ -135,9 +151,34 @@ function loadStoredUser() {
   }
 }
 
+function GoogleGIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 18 18">
+      <path
+        fill="#4285F4"
+        d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.71v2.26h2.91c1.7-1.57 2.69-3.88 2.69-6.61Z"
+      />
+      <path
+        fill="#34A853"
+        d="M9 18c2.43 0 4.47-.8 5.96-2.19l-2.91-2.26c-.81.54-1.84.86-3.05.86-2.35 0-4.34-1.58-5.05-3.71H.94v2.33A9 9 0 0 0 9 18Z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M3.95 10.7A5.41 5.41 0 0 1 3.67 9c0-.59.1-1.16.28-1.7V4.97H.94A9 9 0 0 0 0 9c0 1.45.35 2.82.94 4.03l3.01-2.33Z"
+      />
+      <path
+        fill="#EA4335"
+        d="M9 3.58c1.32 0 2.5.45 3.43 1.35l2.58-2.58A8.65 8.65 0 0 0 9 0 9 9 0 0 0 .94 4.97L3.95 7.3C4.66 5.17 6.65 3.58 9 3.58Z"
+      />
+    </svg>
+  );
+}
+
 function App() {
   const backendBaseUrl = import.meta.env.VITE_BACKEND_BASE_URL ?? 'http://localhost:8080';
-  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? '';
+  const googleClientId =
+    import.meta.env.VITE_GOOGLE_CLIENT_ID ||
+    '122091663263-0eda9eg9mi2jc0vd1dr65smmpk4h4jbr.apps.googleusercontent.com';
   const api = useMemo(() => axios.create({ baseURL: backendBaseUrl }), [backendBaseUrl]);
   const googleButtonRef = useRef(null);
 
@@ -154,9 +195,9 @@ function App() {
   const [albumLoadError, setAlbumLoadError] = useState('');
   const [selectedAlbum, setSelectedAlbum] = useState(null);
   const [activeFilter, setActiveFilter] = useState('all');
+  const [selectedDefectTypes, setSelectedDefectTypes] = useState([]);
   const [query, setQuery] = useState('');
   const [loginError, setLoginError] = useState('');
-  const [pendingView, setPendingView] = useState(null);
   const loggedIn = Boolean(authUser);
   const currentUserId = authUser?.userId ?? '';
 
@@ -193,7 +234,7 @@ function App() {
   }, [selectedFile]);
 
   useEffect(() => {
-    if (view !== 'login' || loggedIn || !googleClientId) {
+    if (view !== 'home' || loggedIn || !googleClientId) {
       return undefined;
     }
 
@@ -218,8 +259,7 @@ function App() {
               const loginResponse = await api.post('/api/auth/google', { credential: response.credential });
               const user = loginResponse.data ?? null;
               setAuthUser(user);
-              setView(pendingView ?? 'home');
-              setPendingView(null);
+              setView('home');
             } catch {
               setLoginError(text.loginFailed);
             }
@@ -258,7 +298,7 @@ function App() {
         googleButtonRef.current.innerHTML = '';
       }
     };
-  }, [api, googleClientId, loggedIn, pendingView, view]);
+  }, [api, googleClientId, loggedIn, view]);
 
   useEffect(() => {
     if (view !== 'album') {
@@ -309,7 +349,6 @@ function App() {
   }, [api, currentUserId, view]);
 
   const filteredAlbum = albumItems.filter((item) => {
-    const matchesFilter = activeFilter === 'all' || item.severity === activeFilter;
     const lowerQuery = query.trim().toLowerCase();
     const matchesQuery =
       !lowerQuery ||
@@ -318,7 +357,39 @@ function App() {
         .toLowerCase()
         .includes(lowerQuery);
 
-    return matchesFilter && matchesQuery;
+    if (!matchesQuery) {
+      return false;
+    }
+
+    if (activeFilter !== 'defectType' || selectedDefectTypes.length === 0) {
+      return true;
+    }
+
+    const itemDefectType = String(item.defectType ?? '').trim().toLowerCase();
+    return selectedDefectTypes.some((selectedValue) => {
+      const option = defectTypeOptions.find((defectType) => defectType.value === selectedValue);
+      return option?.aliases.some((alias) => itemDefectType === alias.toLowerCase()) ?? false;
+    });
+  }).sort((first, second) => {
+    if (activeFilter === 'recent') {
+      return new Date(second.savedAt ?? 0).getTime() - new Date(first.savedAt ?? 0).getTime();
+    }
+
+    if (activeFilter === 'name') {
+      return (first.originalFileName ?? '').localeCompare(second.originalFileName ?? '', 'ko-KR', {
+        numeric: true,
+        sensitivity: 'base',
+      });
+    }
+
+    if (activeFilter === 'defectType') {
+      return (first.defectType ?? '').localeCompare(second.defectType ?? '', 'ko-KR', {
+        numeric: true,
+        sensitivity: 'base',
+      });
+    }
+
+    return 0;
   });
 
   const cameraAnalysis = analysis?.aiAnalysis ?? null;
@@ -350,7 +421,6 @@ function App() {
 
   const handleLogout = () => {
     setAuthUser(null);
-    setPendingView(null);
     setAnalysis(null);
     setSelectedFile(null);
     setPreviewUrl('');
@@ -366,13 +436,15 @@ function App() {
     setView('home');
   };
 
-  const openProtectedView = (nextView) => {
-    if (!loggedIn) {
-      setPendingView(nextView);
-      setView('login');
-      return;
-    }
+  const handleToggleDefectType = (value) => {
+    setSelectedDefectTypes((currentValues) =>
+      currentValues.includes(value)
+        ? currentValues.filter((currentValue) => currentValue !== value)
+        : [...currentValues, value]
+    );
+  };
 
+  const openProtectedView = (nextView) => {
     setView(nextView);
   };
 
@@ -507,21 +579,22 @@ function App() {
           </section>
 
           <section className="login-zone" aria-label={text.login}>
-            <button
-              className="main-button"
-              onClick={() => {
-                if (loggedIn) {
-                  handleLogout();
-                  return;
-                }
-
-                setView('login');
-              }}
-              type="button"
-            >
-              <LockKeyhole size={30} />
-              {loggedIn ? text.logout : text.login}
-            </button>
+            {loggedIn ? (
+              <button className="main-button" onClick={handleLogout} type="button">
+                <LockKeyhole size={30} />
+                {text.logout}
+              </button>
+            ) : (
+              <div className="home-google-login">
+                <div ref={googleButtonRef} />
+                {!googleClientId && (
+                  <button className="google-fallback-button" disabled type="button">
+                    <GoogleGIcon />
+                    {'\uAD6C\uAE00\uB85C \uACC4\uC18D\uD558\uAE30'}
+                  </button>
+                )}
+              </div>
+            )}
           </section>
 
           <section className="quick-menu" aria-label={text.main}>
@@ -546,17 +619,15 @@ function App() {
         </section>
       )}
 
-      {view === 'login' && (
+      {false && view === 'login' && (
         <section className="sub-screen login-screen">
           <div className="screen-title">
             <LockKeyhole size={30} />
             <div>
-              <span>{text.login}</span>
               <h2>{text.loginTitle}</h2>
             </div>
           </div>
             <p>{text.loginHint}</p>
-          {!googleClientId && <p className="message error">{text.loginConfigMissing}</p>}
           {loginError && <p className="message error">{loginError}</p>}
           {loggedIn && authUser ? (
             <section className="login-card">
@@ -575,7 +646,31 @@ function App() {
           ) : (
             <div className="google-login-box">
               <div ref={googleButtonRef} />
-              {!googleClientId && <p className="screen-copy">{text.loginConfigMissing}</p>}
+              {!googleClientId && (
+                <>
+                  <button className="google-fallback-button" disabled type="button">
+                    <svg aria-hidden="true" viewBox="0 0 18 18">
+                      <path
+                        fill="#4285F4"
+                        d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.71v2.26h2.91c1.7-1.57 2.69-3.88 2.69-6.61Z"
+                      />
+                      <path
+                        fill="#34A853"
+                        d="M9 18c2.43 0 4.47-.8 5.96-2.19l-2.91-2.26c-.81.54-1.84.86-3.05.86-2.35 0-4.34-1.58-5.05-3.71H.94v2.33A9 9 0 0 0 9 18Z"
+                      />
+                      <path
+                        fill="#FBBC05"
+                        d="M3.95 10.7A5.41 5.41 0 0 1 3.67 9c0-.59.1-1.16.28-1.7V4.97H.94A9 9 0 0 0 0 9c0 1.45.35 2.82.94 4.03l3.01-2.33Z"
+                      />
+                      <path
+                        fill="#EA4335"
+                        d="M9 3.58c1.32 0 2.5.45 3.43 1.35l2.58-2.58A8.65 8.65 0 0 0 9 0 9 9 0 0 0 .94 4.97L3.95 7.3C4.66 5.17 6.65 3.58 9 3.58Z"
+                      />
+                    </svg>
+                    구글로 계속하기
+                  </button>
+                </>
+              )}
             </div>
           )}
         </section>
@@ -664,6 +759,21 @@ function App() {
               </button>
             ))}
           </div>
+
+          {activeFilter === 'defectType' && (
+            <div className="defect-type-row" aria-label={text.sortDefectType}>
+              {defectTypeOptions.map((option) => (
+                <button
+                  className={selectedDefectTypes.includes(option.value) ? 'selected' : ''}
+                  key={option.value}
+                  onClick={() => handleToggleDefectType(option.value)}
+                  type="button"
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          )}
 
           {albumLoading && <p className="screen-copy">{text.albumLoading}</p>}
           {albumLoadError && <p className="message error">{albumLoadError}</p>}
