@@ -248,6 +248,85 @@ function extractApiErrorMessage(error) {
   return '';
 }
 
+function loadImageFromFile(file) {
+  return new Promise((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(file);
+    const image = new Image();
+
+    image.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(image);
+    };
+
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error('Failed to load image.'));
+    };
+
+    image.src = objectUrl;
+  });
+}
+
+async function compressImageForUpload(file) {
+  const supportedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+  const normalizedType = file?.type?.trim().toLowerCase() ?? '';
+
+  if (!file || !supportedTypes.includes(normalizedType)) {
+    return file;
+  }
+
+  if (file.size <= 4 * 1024 * 1024) {
+    return file;
+  }
+
+  const image = await loadImageFromFile(file);
+  const maxDimension = 1920;
+  const longestSide = Math.max(image.width, image.height) || 1;
+  const scale = Math.min(1, maxDimension / longestSide);
+  const width = Math.max(1, Math.round(image.width * scale));
+  const height = Math.max(1, Math.round(image.height * scale));
+
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+
+  const context = canvas.getContext('2d');
+  if (!context) {
+    return file;
+  }
+
+  context.drawImage(image, 0, 0, width, height);
+
+  const qualitySteps = [0.9, 0.82, 0.74, 0.66, 0.58];
+  const targetBytes = 6 * 1024 * 1024;
+  let bestBlob = null;
+
+  for (const quality of qualitySteps) {
+    const blob = await new Promise((resolve) => {
+      canvas.toBlob(resolve, 'image/jpeg', quality);
+    });
+
+    if (!blob) {
+      continue;
+    }
+
+    bestBlob = blob;
+    if (blob.size <= targetBytes) {
+      break;
+    }
+  }
+
+  if (!bestBlob || bestBlob.size >= file.size) {
+    return file;
+  }
+
+  const normalizedName = file.name?.replace(/\.[^.]+$/, '') || 'capture';
+  return new File([bestBlob], `${normalizedName}.jpg`, {
+    type: 'image/jpeg',
+    lastModified: Date.now(),
+  });
+}
+
 function AnalysisImageViewer({ src, annotations = [], alt = '', emphasizedType = '', visibleTypes = [] }) {
   const [activeSlide, setActiveSlide] = useState(0);
   const [hoveredAnnotation, setHoveredAnnotation] = useState(null);
@@ -891,18 +970,20 @@ function App() {
       return;
     }
 
-    const formData = new FormData();
-    formData.append('file', selectedFile);
-    formData.append('userId', currentUserId);
-    if (cameraLocation) {
-      formData.append('latitude', String(cameraLocation.latitude));
-      formData.append('longitude', String(cameraLocation.longitude));
-    }
     setUploadState('uploading');
     setErrorMessage('');
 
     try {
-    const response = await api.post('/api/images/upload', formData);
+      const uploadFile = await compressImageForUpload(selectedFile);
+      const formData = new FormData();
+      formData.append('file', uploadFile);
+      formData.append('userId', currentUserId);
+      if (cameraLocation) {
+        formData.append('latitude', String(cameraLocation.latitude));
+        formData.append('longitude', String(cameraLocation.longitude));
+      }
+
+      const response = await api.post('/api/images/upload', formData);
       const uploadedRecord = response.data
         ? {
             ...normalizeAlbumRecord(response.data),
