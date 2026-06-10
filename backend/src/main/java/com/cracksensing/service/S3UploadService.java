@@ -32,11 +32,20 @@ import software.amazon.awssdk.services.s3.model.S3Exception;
 public class S3UploadService {
 
     private static final Logger log = LoggerFactory.getLogger(S3UploadService.class);
-    private static final Set<String> ALLOWED_EXTENSIONS = Set.of("jpg", "jpeg", "png");
-    private static final Map<String, String> ALLOWED_CONTENT_TYPES_BY_EXTENSION = Map.of(
-            "jpg", "image/jpeg",
-            "jpeg", "image/jpeg",
-            "png", "image/png"
+    private static final Set<String> ALLOWED_EXTENSIONS = Set.of("jpg", "jpeg", "png", "webp");
+    private static final Map<String, Set<String>> ALLOWED_CONTENT_TYPES_BY_EXTENSION = Map.of(
+            "jpg", Set.of("image/jpeg", "image/jpg", "image/pjpeg"),
+            "jpeg", Set.of("image/jpeg", "image/jpg", "image/pjpeg"),
+            "png", Set.of("image/png", "image/x-png"),
+            "webp", Set.of("image/webp")
+    );
+    private static final Map<String, String> EXTENSION_BY_CONTENT_TYPE = Map.of(
+            "image/jpeg", "jpg",
+            "image/jpg", "jpg",
+            "image/pjpeg", "jpg",
+            "image/png", "png",
+            "image/x-png", "png",
+            "image/webp", "webp"
     );
     private static final DateTimeFormatter DATE_PATH_FORMATTER = DateTimeFormatter.ofPattern("yyyy/MM/dd");
     private static final ZoneId SEOUL_ZONE = ZoneId.of("Asia/Seoul");
@@ -73,16 +82,15 @@ public class S3UploadService {
     }
 
     public AnalysisRecord uploadImage(MultipartFile file, String userId, Double latitude, Double longitude) {
-        validateFile(file);
-
-        String originalFileName = file.getOriginalFilename();
-        String extension = getExtension(originalFileName);
+        FileMetadata fileMetadata = validateFile(file);
+        String originalFileName = fileMetadata.originalFileName();
+        String extension = fileMetadata.extension();
         String objectKey = createObjectKey(extension);
 
         PutObjectRequest putObjectRequest = PutObjectRequest.builder()
                 .bucket(bucketName)
                 .key(objectKey)
-                .contentType(file.getContentType())
+                .contentType(fileMetadata.contentType())
                 .contentLength(file.getSize())
                 .build();
 
@@ -92,7 +100,7 @@ public class S3UploadService {
             log.error(
                     "Image upload failed while saving to S3. originalFileName={}, contentType={}, size={}, bucket={}, objectKey={}",
                     originalFileName,
-                    file.getContentType(),
+                    fileMetadata.contentType(),
                     file.getSize(),
                     bucketName,
                     objectKey,
@@ -138,35 +146,38 @@ public class S3UploadService {
         }
     }
 
-    private void validateFile(MultipartFile file) {
+    private FileMetadata validateFile(MultipartFile file) {
         if (file == null || file.isEmpty()) {
             log.warn("Image upload rejected: file is missing or empty.");
             throw new InvalidImageFileException("Image file is required.");
         }
 
-        String extension = getExtension(file.getOriginalFilename());
+        String contentType = normalizeContentType(file.getContentType());
+        String originalFileName = normalizeOriginalFileName(file.getOriginalFilename(), contentType);
+        String extension = getExtension(originalFileName, contentType);
         if (!ALLOWED_EXTENSIONS.contains(extension)) {
             log.warn(
                     "Image upload rejected: unsupported file extension. originalFileName={}, extension={}, allowedExtensions={}",
-                    file.getOriginalFilename(),
+                    originalFileName,
                     extension,
                     ALLOWED_EXTENSIONS
             );
-            throw new InvalidImageFileException("Only jpg, jpeg, and png images are allowed.");
+            throw new InvalidImageFileException("Only jpg, jpeg, png, and webp images are allowed.");
         }
 
-        String contentType = file.getContentType();
-        String allowedContentType = ALLOWED_CONTENT_TYPES_BY_EXTENSION.get(extension);
-        if (!StringUtils.hasText(contentType) || !allowedContentType.equalsIgnoreCase(contentType)) {
+        Set<String> allowedContentTypes = ALLOWED_CONTENT_TYPES_BY_EXTENSION.getOrDefault(extension, Set.of());
+        if (!StringUtils.hasText(contentType) || !allowedContentTypes.contains(contentType)) {
             log.warn(
-                    "Image upload rejected: extension and content type do not match. originalFileName={}, extension={}, contentType={}, expectedContentType={}",
-                    file.getOriginalFilename(),
+                    "Image upload rejected: extension and content type do not match. originalFileName={}, extension={}, contentType={}, expectedContentTypes={}",
+                    originalFileName,
                     extension,
                     contentType,
-                    allowedContentType
+                    allowedContentTypes
             );
             throw new InvalidImageFileException("File extension and content type do not match.");
         }
+
+        return new FileMetadata(originalFileName, extension, contentType);
     }
 
     private String createObjectKey(String extension) {
@@ -201,12 +212,40 @@ public class S3UploadService {
         );
     }
 
-    private String getExtension(String fileName) {
+    private String getExtension(String fileName, String contentType) {
         String extension = StringUtils.getFilenameExtension(fileName);
         if (!StringUtils.hasText(extension)) {
-            throw new InvalidImageFileException("Image file extension is required.");
+            String inferredExtension = EXTENSION_BY_CONTENT_TYPE.get(contentType);
+            if (!StringUtils.hasText(inferredExtension)) {
+                throw new InvalidImageFileException("Image file extension is required.");
+            }
+            return inferredExtension;
         }
 
         return extension.toLowerCase(Locale.ROOT);
+    }
+
+    private String normalizeContentType(String contentType) {
+        if (!StringUtils.hasText(contentType)) {
+            return "";
+        }
+
+        return contentType.split(";")[0].trim().toLowerCase(Locale.ROOT);
+    }
+
+    private String normalizeOriginalFileName(String originalFileName, String contentType) {
+        if (StringUtils.hasText(originalFileName)) {
+            return originalFileName;
+        }
+
+        String inferredExtension = EXTENSION_BY_CONTENT_TYPE.getOrDefault(contentType, "jpg");
+        return "mobile-capture.%s".formatted(inferredExtension);
+    }
+
+    private record FileMetadata(
+            String originalFileName,
+            String extension,
+            String contentType
+    ) {
     }
 }

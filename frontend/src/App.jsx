@@ -45,6 +45,8 @@ const text = {
   chooseImage: '\uBA3C\uC800 \uC0AC\uC9C4\uC744 \uC120\uD0DD\uD574\uC8FC\uC138\uC694.',
   imageOnly: '\uC774\uBBF8\uC9C0 \uD30C\uC77C\uB9CC \uC120\uD0DD\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.',
   uploadFailed: '\uC5C5\uB85C\uB4DC\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4. \uBC31\uC5D4\uB4DC\uB97C \uD655\uC778\uD574\uC8FC\uC138\uC694.',
+  unsupportedCaptureType:
+    '\uBAA8\uBC14\uC77C \uCE74\uBA54\uB77C \uC0AC\uC9C4 \uD615\uC2DD\uC774 \uC9C0\uC6D0\uB418\uC9C0 \uC54A\uC544\uC694. JPG, PNG, WEBP \uC774\uBBF8\uC9C0\uB85C \uB2E4\uC2DC \uC2DC\uB3C4\uD574\uC8FC\uC138\uC694.',
   result: '\uBD84\uC11D \uACB0\uACFC',
   waiting: '\uBD84\uC11D \uB300\uAE30',
   defectType: '\uADE0\uC5F4 \uC885\uB958',
@@ -219,6 +221,25 @@ function normalizePoint(point, width, height) {
     x: x <= 1 ? x * width : x,
     y: y <= 1 ? y * height : y,
   };
+}
+
+function extractApiErrorMessage(error) {
+  const responseData = error?.response?.data;
+  if (typeof responseData === 'string' && responseData.trim()) {
+    return responseData;
+  }
+
+  if (responseData && typeof responseData === 'object') {
+    if (typeof responseData.message === 'string' && responseData.message.trim()) {
+      return responseData.message;
+    }
+
+    if (typeof responseData.error === 'string' && responseData.error.trim()) {
+      return responseData.error;
+    }
+  }
+
+  return '';
 }
 
 function AnalysisImageViewer({ src, annotations = [], alt = '', emphasizedType = '', visibleTypes = [] }) {
@@ -838,6 +859,13 @@ function App() {
       return;
     }
 
+    const normalizedType = file.type.trim().toLowerCase();
+    const supportedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (normalizedType && !supportedTypes.includes(normalizedType)) {
+      setErrorMessage(text.unsupportedCaptureType);
+      return;
+    }
+
     setSelectedFile(file);
     setAnalysis(null);
     setCameraLocation(null);
@@ -882,9 +910,9 @@ function App() {
       setCameraVisibleTypes([]);
       setAlbumItems((items) => (uploadedRecord ? [uploadedRecord, ...items] : items));
       setUploadState('done');
-    } catch {
+    } catch (error) {
       setUploadState('error');
-      setErrorMessage(text.uploadFailed);
+      setErrorMessage(extractApiErrorMessage(error) || text.uploadFailed);
     }
   };
 
@@ -1124,12 +1152,12 @@ function App() {
 
           <div className="capture-actions">
             <label>
-              <input accept="image/*" capture="environment" onChange={handleFileChange} type="file" />
+              <input accept="image/jpeg,image/png,image/webp" capture="environment" onChange={handleFileChange} type="file" />
               <Building2 size={24} />
               {text.takePhoto}
             </label>
             <label>
-              <input accept="image/*" onChange={handleFileChange} type="file" />
+              <input accept="image/jpeg,image/png,image/webp" onChange={handleFileChange} type="file" />
               <ImageUp size={24} />
               {text.choosePhoto}
             </label>
