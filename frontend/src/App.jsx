@@ -5,10 +5,15 @@ import {
   Camera,
   ChevronLeft,
   ChevronRight,
+  Expand,
   FolderSearch,
   ImageUp,
   Images,
   LockKeyhole,
+  Trash2,
+  X,
+  ZoomIn,
+  ZoomOut,
   Search,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -53,22 +58,35 @@ const text = {
   albumDetailTitle: '\uC0C1\uC138 \uC815\uBCF4',
   albumLoading: '\uC568\uBC94 \uB85C\uB529 \uC911',
   albumLoadFailed: '\uC568\uBC94 \uB85C\uB529\uc5d0 \uC2E4\ud328\ud588\uc2b5\ub2c8\ub2e4.',
+  albumDelete: '\uC0AD\uC81C',
+  albumDeleteConfirm: '\uC120\uD0DD\uD55C \uBD84\uC11D \uAE30\uB85D\uC744 \uC0AD\uC81C\uD560\uAE4C\uC694?',
+  albumDeleteFailed: '\uC568\uBC94 \uC0AD\uC81C\uc5d0 \uC2E4\ud328\ud588\uc2b5\ub2c8\ub2e4.',
+  albumDetailToggleOpen: '\uC0C1\uC138 \uC815\uBCF4 \uBCF4\uAE30',
+  albumDetailToggleClose: '\uC0C1\uC138 \uC815\uBCF4 \uC811\uAE30',
   search: '\uAC80\uC0C9',
   searchPlaceholder: '\uC704\uCE58, \uACB0\uD568 \uC720\uD615, \uBA54\uBAA8 \uAC80\uC0C9',
   all: '\uC804\uCCB4',
   recent: '\uCD5C\uADFC',
   sortName: '\uC774\uB984',
+  sortLocation: '\uC704\uCE58',
   sortDefectType: '\uADE0\uC5F4\uC885\uB958',
   safe: '\uC815\uC0C1',
   danger: '\uC704\uD5D8',
   emptyAlbum: '\uC870\uAC74\uC5D0 \uB9DE\uB294 \uC568\uBC94\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.',
   server: '\uC11C\uBC84',
+  fullscreenOpen: '\uC804\uCCB4\uD654\uBA74',
+  fullscreenClose: '\uB2EB\uAE30',
+  zoomIn: '\uD655\uB300',
+  zoomOut: '\uCD95\uC18C',
+  imageOriginal: '\uC6D0\uBCF8',
+  imageAnalyzed: '\uBD84\uC11D',
 };
 
 const filters = [
   { value: 'all', label: text.all },
   { value: 'recent', label: text.recent },
   { value: 'name', label: text.sortName },
+  { value: 'location', label: text.sortLocation },
   { value: 'defectType', label: text.sortDefectType },
 ];
 
@@ -129,6 +147,10 @@ function getAnnotationClassName(annotation) {
   return annotation?.class_name ?? annotation?.className ?? text.safe;
 }
 
+function getNormalizedAnnotationName(annotation) {
+  return getAnnotationClassName(annotation).trim().toLowerCase();
+}
+
 function getAnnotationPoints(annotation) {
   return Array.isArray(annotation?.points) ? annotation.points : [];
 }
@@ -182,6 +204,14 @@ function formatLocation(location) {
   return `${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}`;
 }
 
+function getLocationFilterKey(location) {
+  if (!location) {
+    return text.locationUnavailable;
+  }
+
+  return `${location.latitude.toFixed(3)}, ${location.longitude.toFixed(3)}`;
+}
+
 function normalizePoint(point, width, height) {
   const [rawX = 0, rawY = 0] = point ?? [];
   const x = Number(rawX);
@@ -193,17 +223,112 @@ function normalizePoint(point, width, height) {
   };
 }
 
-function AnalysisImageViewer({ src, annotations = [], alt = '' }) {
+function AnalysisImageViewer({ src, annotations = [], alt = '', emphasizedType = '', visibleTypes = [] }) {
   const [activeSlide, setActiveSlide] = useState(0);
   const [hoveredAnnotation, setHoveredAnnotation] = useState(null);
+  const [isFullscreenOpen, setIsFullscreenOpen] = useState(false);
+  const [zoom, setZoom] = useState(1);
   const [imageSize, setImageSize] = useState({ width: 1, height: 1 });
   const hasAnnotations = annotations.length > 0;
   const isAnalysisSlide = hasAnnotations && activeSlide === 1;
+  const normalizedVisibleTypes = visibleTypes.map((type) => type.trim().toLowerCase());
+  const normalizedEmphasizedType = emphasizedType.trim().toLowerCase();
+  const displayedAnnotations =
+    normalizedVisibleTypes.length > 0
+      ? annotations.filter((annotation) => normalizedVisibleTypes.includes(getNormalizedAnnotationName(annotation)))
+      : annotations;
 
-  const toggleSlide = () => {
-    setActiveSlide((currentSlide) => (currentSlide === 0 ? 1 : 0));
+  const showSlide = (slideIndex) => {
+    setActiveSlide(slideIndex);
     setHoveredAnnotation(null);
   };
+
+  const toggleSlide = () => {
+    showSlide(activeSlide === 0 ? 1 : 0);
+  };
+
+  const openFullscreen = () => {
+    setIsFullscreenOpen(true);
+    setZoom(1);
+  };
+
+  const closeFullscreen = () => {
+    setIsFullscreenOpen(false);
+    setZoom(1);
+  };
+
+  const increaseZoom = () => setZoom((currentZoom) => Math.min(currentZoom + 0.25, 3));
+  const decreaseZoom = () => setZoom((currentZoom) => Math.max(currentZoom - 0.25, 1));
+
+  useEffect(() => {
+    if (hasAnnotations && (normalizedEmphasizedType || normalizedVisibleTypes.length > 0)) {
+      setActiveSlide(1);
+    }
+  }, [hasAnnotations, normalizedEmphasizedType, normalizedVisibleTypes.length]);
+
+  const renderOverlay = (renderedAnnotations) => (
+    <div className="analysis-overlay">
+      <svg aria-hidden="true" preserveAspectRatio="xMidYMid meet" viewBox={`0 0 ${imageSize.width} ${imageSize.height}`}>
+        {renderedAnnotations.map((annotation, index) => {
+          const points = getAnnotationPoints(annotation).map((point) => normalizePoint(point, imageSize.width, imageSize.height));
+          if (points.length === 0) {
+            return null;
+          }
+
+          const annotationName = getAnnotationClassName(annotation);
+          const normalizedAnnotationName = annotationName.trim().toLowerCase();
+          const isEmphasized = normalizedEmphasizedType && normalizedAnnotationName === normalizedEmphasizedType;
+          const shouldFade = normalizedEmphasizedType && normalizedAnnotationName !== normalizedEmphasizedType;
+          const color = getAnnotationColor(index);
+          const pointString = points.map((point) => `${point.x},${point.y}`).join(' ');
+
+          return (
+            <g key={`${annotationName}-${index}`} opacity={shouldFade ? 0.2 : 1}>
+              {points.length >= 3 && (
+                <polygon
+                  fill={color}
+                  onMouseEnter={() => setHoveredAnnotation({ annotation, index })}
+                  onMouseLeave={() => setHoveredAnnotation(null)}
+                  opacity={isEmphasized ? 0.42 : 0.2}
+                  points={pointString}
+                />
+              )}
+              <polyline
+                onMouseEnter={() => setHoveredAnnotation({ annotation, index })}
+                onMouseLeave={() => setHoveredAnnotation(null)}
+                points={pointString}
+                stroke={color}
+                strokeWidth={isEmphasized ? 8 : 5}
+              />
+              {points.map((point, pointIndex) => (
+                <circle cx={point.x} cy={point.y} fill={color} key={pointIndex} r={isEmphasized ? 5 : 4} />
+              ))}
+            </g>
+          );
+        })}
+      </svg>
+      {hoveredAnnotation && (
+        <span
+          className="annotation-tooltip"
+          style={{
+            '--tooltip-x': `${getAnnotationCenter(
+              getAnnotationPoints(hoveredAnnotation.annotation),
+              imageSize.width,
+              imageSize.height
+            ).x}%`,
+            '--tooltip-y': `${getAnnotationCenter(
+              getAnnotationPoints(hoveredAnnotation.annotation),
+              imageSize.width,
+              imageSize.height
+            ).y}%`,
+            '--tooltip-color': getAnnotationColor(hoveredAnnotation.index),
+          }}
+        >
+          {getAnnotationClassName(hoveredAnnotation.annotation)}
+        </span>
+      )}
+    </div>
+  );
 
   return (
     <div className="analysis-viewer">
@@ -217,65 +342,9 @@ function AnalysisImageViewer({ src, annotations = [], alt = '' }) {
           });
         }}
         src={src}
+        style={{ '--image-zoom': zoom }}
       />
-      {isAnalysisSlide && (
-        <div className="analysis-overlay">
-          <svg aria-hidden="true" preserveAspectRatio="xMidYMid meet" viewBox={`0 0 ${imageSize.width} ${imageSize.height}`}>
-            {annotations.map((annotation, index) => {
-              const points = (annotation.points ?? []).map((point) => normalizePoint(point, imageSize.width, imageSize.height));
-              if (points.length === 0) {
-                return null;
-              }
-
-              const color = getAnnotationColor(index);
-              const pointString = points.map((point) => `${point.x},${point.y}`).join(' ');
-
-              return (
-                <g key={`${getAnnotationClassName(annotation)}-${index}`}>
-                  {points.length >= 3 && (
-                    <polygon
-                      fill={color}
-                      onMouseEnter={() => setHoveredAnnotation({ annotation, index })}
-                      onMouseLeave={() => setHoveredAnnotation(null)}
-                      opacity="0.2"
-                      points={pointString}
-                    />
-                  )}
-                  <polyline
-                    onMouseEnter={() => setHoveredAnnotation({ annotation, index })}
-                    onMouseLeave={() => setHoveredAnnotation(null)}
-                    points={pointString}
-                    stroke={color}
-                  />
-                  {points.map((point, pointIndex) => (
-                    <circle cx={point.x} cy={point.y} fill={color} key={pointIndex} r="4" />
-                  ))}
-                </g>
-              );
-            })}
-          </svg>
-          {hoveredAnnotation && (
-            <span
-              className="annotation-tooltip"
-              style={{
-                '--tooltip-x': `${getAnnotationCenter(
-                  getAnnotationPoints(hoveredAnnotation.annotation),
-                  imageSize.width,
-                  imageSize.height
-                ).x}%`,
-                '--tooltip-y': `${getAnnotationCenter(
-                  getAnnotationPoints(hoveredAnnotation.annotation),
-                  imageSize.width,
-                  imageSize.height
-                ).y}%`,
-                '--tooltip-color': getAnnotationColor(hoveredAnnotation.index),
-              }}
-            >
-              {getAnnotationClassName(hoveredAnnotation.annotation)}
-            </span>
-          )}
-        </div>
-      )}
+      {isAnalysisSlide && renderOverlay(displayedAnnotations)}
       {hasAnnotations && (
         <>
           <button aria-label="원본 사진 보기" className="slide-arrow left" onClick={toggleSlide} type="button">
@@ -290,6 +359,31 @@ function AnalysisImageViewer({ src, annotations = [], alt = '' }) {
           </div>
         </>
       )}
+      <button aria-label={text.fullscreenOpen} className="viewer-expand" onClick={openFullscreen} type="button">
+        <Expand size={18} />
+      </button>
+      {isFullscreenOpen && (
+        <div className="viewer-modal" role="dialog" aria-label={text.fullscreenOpen} aria-modal="true">
+          <div className="viewer-modal-bar">
+            <strong>{alt}</strong>
+            <div className="viewer-modal-actions">
+              <button aria-label={text.zoomOut} className="icon-button" onClick={decreaseZoom} type="button">
+                <ZoomOut size={18} />
+              </button>
+              <button aria-label={text.zoomIn} className="icon-button" onClick={increaseZoom} type="button">
+                <ZoomIn size={18} />
+              </button>
+              <button aria-label={text.fullscreenClose} className="icon-button" onClick={closeFullscreen} type="button">
+                <X size={18} />
+              </button>
+            </div>
+          </div>
+          <div className="viewer-modal-stage" style={{ '--viewer-zoom': zoom }}>
+            <img alt={alt} className="analysis-image fullscreen" src={src} style={{ '--image-zoom': zoom }} />
+            {isAnalysisSlide && renderOverlay(displayedAnnotations)}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -301,6 +395,8 @@ function normalizeAlbumRecord(record) {
   const firstAnnotation = annotations[0];
   const defectType = record.defectType ?? getDefectLabel(record.aiAnalysis);
   const annotationCount = record.annotationCount ?? annotations.length;
+  const location = getRecordLocation(record);
+  const defectTypes = getUniqueAnnotationTypes(annotations);
 
   return {
     id: record.objectKey,
@@ -312,10 +408,12 @@ function normalizeAlbumRecord(record) {
     userId: record.userId,
     latitude: record.latitude,
     longitude: record.longitude,
+    locationKey: getLocationFilterKey(location),
     aiAnalysis: record.aiAnalysis,
     severity,
     severityLabel,
     defectType,
+    defectTypes,
     confidence: null,
     ratio: null,
     note: record.originalFileName,
@@ -381,8 +479,14 @@ function App() {
   const [albumLoading, setAlbumLoading] = useState(false);
   const [albumLoadError, setAlbumLoadError] = useState('');
   const [selectedAlbum, setSelectedAlbum] = useState(null);
+  const [isAlbumDetailOpen, setIsAlbumDetailOpen] = useState(true);
   const [activeFilter, setActiveFilter] = useState('all');
   const [selectedDefectTypes, setSelectedDefectTypes] = useState([]);
+  const [selectedLocations, setSelectedLocations] = useState([]);
+  const [cameraHoveredType, setCameraHoveredType] = useState('');
+  const [albumHoveredType, setAlbumHoveredType] = useState('');
+  const [cameraVisibleTypes, setCameraVisibleTypes] = useState([]);
+  const [albumVisibleTypes, setAlbumVisibleTypes] = useState([]);
   const [query, setQuery] = useState('');
   const [loginError, setLoginError] = useState('');
   const loggedIn = Boolean(authUser);
@@ -539,7 +643,15 @@ function App() {
     const lowerQuery = query.trim().toLowerCase();
     const matchesQuery =
       !lowerQuery ||
-      [item.originalFileName, item.objectKey, item.defectType, item.severityLabel, item.userId, item.note]
+      [
+        item.originalFileName,
+        item.objectKey,
+        item.defectType,
+        item.defectTypes?.join(' '),
+        item.locationKey,
+        item.userId,
+        item.note,
+      ]
         .join(' ')
         .toLowerCase()
         .includes(lowerQuery);
@@ -548,15 +660,19 @@ function App() {
       return false;
     }
 
-    if (activeFilter !== 'defectType' || selectedDefectTypes.length === 0) {
-      return true;
+    if (activeFilter === 'defectType' && selectedDefectTypes.length > 0) {
+      const itemDefectLabels = getRecordDefectLabels(item);
+      return selectedDefectTypes.every((selectedValue) => {
+        const option = defectTypeOptions.find((defectType) => defectType.value === selectedValue);
+        return option?.aliases.some((alias) => itemDefectLabels.includes(alias.toLowerCase())) ?? false;
+      });
     }
 
-    const itemDefectLabels = getRecordDefectLabels(item);
-    return selectedDefectTypes.every((selectedValue) => {
-      const option = defectTypeOptions.find((defectType) => defectType.value === selectedValue);
-      return option?.aliases.some((alias) => itemDefectLabels.includes(alias.toLowerCase())) ?? false;
-    });
+    if (activeFilter === 'location' && selectedLocations.length > 0) {
+      return selectedLocations.includes(item.locationKey);
+    }
+
+    return true;
   }).sort((first, second) => {
     if (activeFilter === 'recent') {
       return new Date(second.savedAt ?? 0).getTime() - new Date(first.savedAt ?? 0).getTime();
@@ -576,19 +692,32 @@ function App() {
       });
     }
 
+    if (activeFilter === 'location') {
+      return (first.locationKey ?? '').localeCompare(second.locationKey ?? '', 'ko-KR', {
+        numeric: true,
+        sensitivity: 'base',
+      });
+    }
+
     return 0;
   });
+
+  const locationOptions = [...new Set(albumItems.map((item) => item.locationKey).filter(Boolean))];
 
   const cameraAnalysis = analysis?.aiAnalysis ?? null;
   const cameraAnnotations = cameraAnalysis?.annotations ?? [];
   const cameraDefectTypes = getUniqueAnnotationTypes(cameraAnnotations);
   const selectedAlbumAnnotations = selectedAlbum?.aiAnalysis?.annotations ?? [];
   const selectedAlbumDefectTypes = getUniqueAnnotationTypes(selectedAlbumAnnotations);
+  const selectedAlbumDisplayTypes = selectedAlbum?.defectTypes?.length > 0 ? selectedAlbum.defectTypes : selectedAlbumDefectTypes;
   const cameraDisplayLocation = getRecordLocation(analysis) ?? cameraLocation;
   const selectedAlbumLocation = getRecordLocation(selectedAlbum);
 
   const handleSelectAlbum = async (item) => {
     setSelectedAlbum(item);
+    setIsAlbumDetailOpen(true);
+    setAlbumHoveredType('');
+    setAlbumVisibleTypes([]);
 
     if (!item?.objectKey) {
       return;
@@ -620,7 +749,14 @@ function App() {
     setAlbumLoading(false);
     setAlbumLoadError('');
     setSelectedAlbum(null);
+    setIsAlbumDetailOpen(true);
     setActiveFilter('all');
+    setSelectedLocations([]);
+    setSelectedDefectTypes([]);
+    setCameraHoveredType('');
+    setAlbumHoveredType('');
+    setCameraVisibleTypes([]);
+    setAlbumVisibleTypes([]);
     setQuery('');
     setLoginError('');
     setView('home');
@@ -632,6 +768,31 @@ function App() {
         ? currentValues.filter((currentValue) => currentValue !== value)
         : [...currentValues, value]
     );
+  };
+
+  const handleToggleLocation = (value) => {
+    setSelectedLocations((currentValues) =>
+      currentValues.includes(value)
+        ? currentValues.filter((currentValue) => currentValue !== value)
+        : [...currentValues, value]
+    );
+  };
+
+  const handleToggleVisibleType = (scope, type) => {
+    const setter = scope === 'camera' ? setCameraVisibleTypes : setAlbumVisibleTypes;
+    setter((currentValues) =>
+      currentValues.includes(type) ? currentValues.filter((currentValue) => currentValue !== type) : [...currentValues, type]
+    );
+  };
+
+  const handleChangeFilter = (filterValue) => {
+    setActiveFilter(filterValue);
+    if (filterValue !== 'defectType') {
+      setSelectedDefectTypes([]);
+    }
+    if (filterValue !== 'location') {
+      setSelectedLocations([]);
+    }
   };
 
   const openProtectedView = (nextView) => {
@@ -670,6 +831,8 @@ function App() {
     setSelectedFile(file);
     setAnalysis(null);
     setCameraLocation(null);
+    setCameraHoveredType('');
+    setCameraVisibleTypes([]);
     requestCurrentLocation();
   };
 
@@ -705,12 +868,41 @@ function App() {
         : null;
 
       setAnalysis(uploadedRecord);
+      setCameraHoveredType('');
+      setCameraVisibleTypes([]);
       setAlbumItems((items) => (uploadedRecord ? [uploadedRecord, ...items] : items));
       setSelectedAlbum(uploadedRecord);
       setUploadState('done');
     } catch {
       setUploadState('error');
       setErrorMessage(text.uploadFailed);
+    }
+  };
+
+  const handleDeleteAlbum = async () => {
+    if (!selectedAlbum?.objectKey) {
+      return;
+    }
+
+    if (!window.confirm(text.albumDeleteConfirm)) {
+      return;
+    }
+
+    try {
+      await api.delete('/api/albums', {
+        params: {
+          objectKey: selectedAlbum.objectKey,
+          userId: currentUserId,
+        },
+      });
+
+      setAlbumItems((currentItems) => {
+        const nextItems = currentItems.filter((item) => item.objectKey !== selectedAlbum.objectKey);
+        setSelectedAlbum(nextItems[0] ?? null);
+        return nextItems;
+      });
+    } catch {
+      setAlbumLoadError(text.albumDeleteFailed);
     }
   };
 
@@ -907,7 +1099,13 @@ function App() {
 
           <div className="preview-frame">
             {previewUrl ? (
-              <AnalysisImageViewer alt={selectedFile?.name ?? ''} annotations={cameraAnalysis?.annotations ?? []} src={previewUrl} />
+              <AnalysisImageViewer
+                alt={selectedFile?.name ?? ''}
+                annotations={cameraAnalysis?.annotations ?? []}
+                emphasizedType={cameraHoveredType}
+                src={previewUrl}
+                visibleTypes={cameraVisibleTypes}
+              />
             ) : (
               <span>{text.noImage}</span>
             )}
@@ -936,7 +1134,24 @@ function App() {
             <dl>
               <div>
                 <dt>{text.defectTypes}</dt>
-                <dd>{cameraDefectTypes.length > 0 ? cameraDefectTypes.join(', ') : '-'}</dd>
+                <dd className="type-chip-row">
+                  {cameraDefectTypes.length > 0 ? (
+                    cameraDefectTypes.map((type) => (
+                      <button
+                        className={cameraVisibleTypes.includes(type) ? 'type-chip selected' : 'type-chip'}
+                        key={type}
+                        onClick={() => handleToggleVisibleType('camera', type)}
+                        onMouseEnter={() => setCameraHoveredType(type)}
+                        onMouseLeave={() => setCameraHoveredType('')}
+                        type="button"
+                      >
+                        {type}
+                      </button>
+                    ))
+                  ) : (
+                    <span>-</span>
+                  )}
+                </dd>
               </div>
               <div>
                 <dt>{text.coordinates}</dt>
@@ -972,13 +1187,28 @@ function App() {
               <button
                 className={activeFilter === filter.value ? 'active' : ''}
                 key={filter.value}
-                onClick={() => setActiveFilter(filter.value)}
+                onClick={() => handleChangeFilter(filter.value)}
                 type="button"
               >
                 {filter.label}
               </button>
             ))}
           </div>
+
+          {activeFilter === 'location' && (
+            <div className="defect-type-row" aria-label={text.sortLocation}>
+              {locationOptions.map((option) => (
+                <button
+                  className={selectedLocations.includes(option) ? 'selected' : ''}
+                  key={option}
+                  onClick={() => handleToggleLocation(option)}
+                  type="button"
+                >
+                  {option}
+                </button>
+              ))}
+            </div>
+          )}
 
           {activeFilter === 'defectType' && (
             <div className="defect-type-row" aria-label={text.sortDefectType}>
@@ -1020,7 +1250,8 @@ function App() {
                   <div>
                     <strong>{item.originalFileName}</strong>
                     <span>{item.savedAt ? new Date(item.savedAt).toLocaleString('ko-KR') : '-'}</span>
-                    <p>{item.defectType}</p>
+                    <p>{item.defectTypes?.length > 0 ? item.defectTypes.join(', ') : item.defectType}</p>
+                    <span>{item.locationKey}</span>
                   </div>
                 </article>
               ))
@@ -1031,32 +1262,66 @@ function App() {
 
           {selectedAlbum && (
             <section className="result-card">
-              <h3>{text.albumDetailTitle}</h3>
-              <div className="preview-frame album-preview">
-                {selectedAlbum.objectUrl ? (
-                  <AnalysisImageViewer
-                    alt={selectedAlbum.originalFileName}
-                    annotations={selectedAlbum.aiAnalysis?.annotations ?? []}
-                    src={selectedAlbum.objectUrl}
-                  />
-                ) : (
-                  <span>{text.noImage}</span>
-                )}
+              <div className="detail-header">
+                <h3>{text.albumDetailTitle}</h3>
+                <div className="detail-actions">
+                  <button className="ghost-button compact" onClick={() => setIsAlbumDetailOpen((currentValue) => !currentValue)} type="button">
+                    {isAlbumDetailOpen ? text.albumDetailToggleClose : text.albumDetailToggleOpen}
+                  </button>
+                  <button className="danger-button compact" onClick={handleDeleteAlbum} type="button">
+                    <Trash2 size={16} />
+                    {text.albumDelete}
+                  </button>
+                </div>
               </div>
-              <dl>
-                <div>
-                  <dt>{text.defectTypes}</dt>
-                  <dd>{selectedAlbumDefectTypes.length > 0 ? selectedAlbumDefectTypes.join(', ') : selectedAlbum.defectType ?? '-'}</dd>
-                </div>
-                <div>
-                  <dt>{text.analyzedAt}</dt>
-                  <dd>{formatDate(selectedAlbum.savedAt)}</dd>
-                </div>
-                <div>
-                  <dt>{text.coordinates}</dt>
-                  <dd>{formatLocation(selectedAlbumLocation)}</dd>
-                </div>
-              </dl>
+              {isAlbumDetailOpen && (
+                <>
+                  <div className="preview-frame album-preview">
+                    {selectedAlbum.objectUrl ? (
+                      <AnalysisImageViewer
+                        alt={selectedAlbum.originalFileName}
+                        annotations={selectedAlbum.aiAnalysis?.annotations ?? []}
+                        emphasizedType={albumHoveredType}
+                        src={selectedAlbum.objectUrl}
+                        visibleTypes={albumVisibleTypes}
+                      />
+                    ) : (
+                      <span>{text.noImage}</span>
+                    )}
+                  </div>
+                  <dl>
+                    <div>
+                      <dt>{text.defectTypes}</dt>
+                      <dd className="type-chip-row">
+                        {selectedAlbumDisplayTypes.length > 0 ? (
+                          selectedAlbumDisplayTypes.map((type) => (
+                            <button
+                              className={albumVisibleTypes.includes(type) ? 'type-chip selected' : 'type-chip'}
+                              key={type}
+                              onClick={() => handleToggleVisibleType('album', type)}
+                              onMouseEnter={() => setAlbumHoveredType(type)}
+                              onMouseLeave={() => setAlbumHoveredType('')}
+                              type="button"
+                            >
+                              {type}
+                            </button>
+                          ))
+                        ) : (
+                          <span>{selectedAlbum.defectType ?? '-'}</span>
+                        )}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>{text.analyzedAt}</dt>
+                      <dd>{formatDate(selectedAlbum.savedAt)}</dd>
+                    </div>
+                    <div>
+                      <dt>{text.coordinates}</dt>
+                      <dd>{formatLocation(selectedAlbumLocation)}</dd>
+                    </div>
+                  </dl>
+                </>
+              )}
             </section>
           )}
         </section>

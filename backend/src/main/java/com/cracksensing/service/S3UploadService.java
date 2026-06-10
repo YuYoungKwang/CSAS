@@ -24,6 +24,7 @@ import com.cracksensing.exception.S3UploadException;
 
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 
@@ -116,6 +117,25 @@ public class S3UploadService {
         AnalysisRecord storedRecord = weaviateStorageService.save(analysisRecord);
 
         return withPresignedUrl(storedRecord);
+    }
+
+    public boolean deleteImage(String objectKey) {
+        if (!StringUtils.hasText(objectKey)) {
+            return false;
+        }
+
+        try {
+            s3Client.deleteObject(
+                    DeleteObjectRequest.builder()
+                            .bucket(bucketName)
+                            .key(objectKey)
+                            .build()
+            );
+            return true;
+        } catch (S3Exception exception) {
+            log.error("Failed to delete image from S3. bucket={}, objectKey={}", bucketName, objectKey, exception);
+            return false;
+        }
     }
 
     private void validateFile(MultipartFile file) {

@@ -77,6 +77,25 @@ public class WeaviateStorageService {
         return record;
     }
 
+    public boolean deleteByObjectKey(String objectKey) {
+        if (!isConfigured() || !StringUtils.hasText(objectKey)) {
+            return false;
+        }
+
+        try {
+            restTemplate.exchange(
+                    weaviateUrl + "/v1/objects/" + collectionName + "/" + createObjectId(objectKey),
+                    HttpMethod.DELETE,
+                    new HttpEntity<>(createHeaders()),
+                    Void.class
+            );
+            return true;
+        } catch (RestClientException exception) {
+            log.error("Failed to delete analysis record from Weaviate. objectKey={}, collectionName={}", objectKey, collectionName, exception);
+            return false;
+        }
+    }
+
     private void ensureCollection() {
         if (collectionChecked) {
             return;
