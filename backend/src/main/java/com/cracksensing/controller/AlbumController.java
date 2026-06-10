@@ -73,9 +73,9 @@ public class AlbumController {
         }
 
         boolean weaviateDeleted = weaviateStorageService.deleteByObjectKey(objectKey);
-        boolean imageDeleted = s3UploadService.deleteImage(objectKey);
+        s3UploadService.deleteImage(objectKey);
 
-        if (!weaviateDeleted || !imageDeleted) {
+        if (!weaviateDeleted) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to delete album record.");
         }
     }

@@ -61,8 +61,6 @@ const text = {
   albumDelete: '\uC0AD\uC81C',
   albumDeleteConfirm: '\uC120\uD0DD\uD55C \uBD84\uC11D \uAE30\uB85D\uC744 \uC0AD\uC81C\uD560\uAE4C\uC694?',
   albumDeleteFailed: '\uC568\uBC94 \uC0AD\uC81C\uc5d0 \uC2E4\ud328\ud588\uc2b5\ub2c8\ub2e4.',
-  albumDetailToggleOpen: '\uC0C1\uC138 \uC815\uBCF4 \uBCF4\uAE30',
-  albumDetailToggleClose: '\uC0C1\uC138 \uC815\uBCF4 \uC811\uAE30',
   search: '\uAC80\uC0C9',
   searchPlaceholder: '\uC704\uCE58, \uACB0\uD568 \uC720\uD615, \uBA54\uBAA8 \uAC80\uC0C9',
   all: '\uC804\uCCB4',
@@ -233,18 +231,11 @@ function AnalysisImageViewer({ src, annotations = [], alt = '', emphasizedType =
   const isAnalysisSlide = hasAnnotations && activeSlide === 1;
   const normalizedVisibleTypes = visibleTypes.map((type) => type.trim().toLowerCase());
   const normalizedEmphasizedType = emphasizedType.trim().toLowerCase();
-  const displayedAnnotations =
-    normalizedVisibleTypes.length > 0
-      ? annotations.filter((annotation) => normalizedVisibleTypes.includes(getNormalizedAnnotationName(annotation)))
-      : annotations;
+  const activeTypeSet = new Set([...normalizedVisibleTypes, normalizedEmphasizedType].filter(Boolean));
 
   const showSlide = (slideIndex) => {
     setActiveSlide(slideIndex);
     setHoveredAnnotation(null);
-  };
-
-  const toggleSlide = () => {
-    showSlide(activeSlide === 0 ? 1 : 0);
   };
 
   const openFullscreen = () => {
@@ -266,10 +257,10 @@ function AnalysisImageViewer({ src, annotations = [], alt = '', emphasizedType =
     }
   }, [hasAnnotations, normalizedEmphasizedType, normalizedVisibleTypes.length]);
 
-  const renderOverlay = (renderedAnnotations) => (
+  const renderOverlay = () => (
     <div className="analysis-overlay">
       <svg aria-hidden="true" preserveAspectRatio="xMidYMid meet" viewBox={`0 0 ${imageSize.width} ${imageSize.height}`}>
-        {renderedAnnotations.map((annotation, index) => {
+        {annotations.map((annotation, index) => {
           const points = getAnnotationPoints(annotation).map((point) => normalizePoint(point, imageSize.width, imageSize.height));
           if (points.length === 0) {
             return null;
@@ -277,8 +268,8 @@ function AnalysisImageViewer({ src, annotations = [], alt = '', emphasizedType =
 
           const annotationName = getAnnotationClassName(annotation);
           const normalizedAnnotationName = annotationName.trim().toLowerCase();
-          const isEmphasized = normalizedEmphasizedType && normalizedAnnotationName === normalizedEmphasizedType;
-          const shouldFade = normalizedEmphasizedType && normalizedAnnotationName !== normalizedEmphasizedType;
+          const isHighlighted = activeTypeSet.size > 0 && activeTypeSet.has(normalizedAnnotationName);
+          const shouldFade = activeTypeSet.size > 0 && !activeTypeSet.has(normalizedAnnotationName);
           const color = getAnnotationColor(index);
           const pointString = points.map((point) => `${point.x},${point.y}`).join(' ');
 
@@ -289,7 +280,7 @@ function AnalysisImageViewer({ src, annotations = [], alt = '', emphasizedType =
                   fill={color}
                   onMouseEnter={() => setHoveredAnnotation({ annotation, index })}
                   onMouseLeave={() => setHoveredAnnotation(null)}
-                  opacity={isEmphasized ? 0.42 : 0.2}
+                  opacity={isHighlighted ? 0.42 : 0.2}
                   points={pointString}
                 />
               )}
@@ -298,10 +289,10 @@ function AnalysisImageViewer({ src, annotations = [], alt = '', emphasizedType =
                 onMouseLeave={() => setHoveredAnnotation(null)}
                 points={pointString}
                 stroke={color}
-                strokeWidth={isEmphasized ? 8 : 5}
+                strokeWidth={isHighlighted ? 8 : 5}
               />
               {points.map((point, pointIndex) => (
-                <circle cx={point.x} cy={point.y} fill={color} key={pointIndex} r={isEmphasized ? 5 : 4} />
+                <circle cx={point.x} cy={point.y} fill={color} key={pointIndex} r={isHighlighted ? 5 : 4} />
               ))}
             </g>
           );
@@ -344,19 +335,33 @@ function AnalysisImageViewer({ src, annotations = [], alt = '', emphasizedType =
         src={src}
         style={{ '--image-zoom': zoom }}
       />
-      {isAnalysisSlide && renderOverlay(displayedAnnotations)}
+      {isAnalysisSlide && renderOverlay()}
       {hasAnnotations && (
         <>
-          <button aria-label="원본 사진 보기" className="slide-arrow left" onClick={toggleSlide} type="button">
+          <div className="slide-status" role="tablist" aria-label={alt}>
+            <button
+              aria-selected={activeSlide === 0}
+              className={activeSlide === 0 ? 'active' : ''}
+              onClick={() => showSlide(0)}
+              type="button"
+            >
+              {text.imageOriginal}
+            </button>
+            <button
+              aria-selected={activeSlide === 1}
+              className={activeSlide === 1 ? 'active' : ''}
+              onClick={() => showSlide(1)}
+              type="button"
+            >
+              {text.imageAnalyzed}
+            </button>
+          </div>
+          <button aria-label={text.imageOriginal} className="slide-arrow left" onClick={() => showSlide(0)} type="button">
             <ChevronLeft size={22} />
           </button>
-          <button aria-label="분석 완료 사진 보기" className="slide-arrow right" onClick={toggleSlide} type="button">
+          <button aria-label={text.imageAnalyzed} className="slide-arrow right" onClick={() => showSlide(1)} type="button">
             <ChevronRight size={22} />
           </button>
-          <div className="slide-status">
-            <span className={activeSlide === 0 ? 'active' : ''}>원본</span>
-            <span className={activeSlide === 1 ? 'active' : ''}>분석</span>
-          </div>
         </>
       )}
       <button aria-label={text.fullscreenOpen} className="viewer-expand" onClick={openFullscreen} type="button">
@@ -380,7 +385,7 @@ function AnalysisImageViewer({ src, annotations = [], alt = '', emphasizedType =
           </div>
           <div className="viewer-modal-stage" style={{ '--viewer-zoom': zoom }}>
             <img alt={alt} className="analysis-image fullscreen" src={src} style={{ '--image-zoom': zoom }} />
-            {isAnalysisSlide && renderOverlay(displayedAnnotations)}
+            {isAnalysisSlide && renderOverlay()}
           </div>
         </div>
       )}
@@ -479,7 +484,6 @@ function App() {
   const [albumLoading, setAlbumLoading] = useState(false);
   const [albumLoadError, setAlbumLoadError] = useState('');
   const [selectedAlbum, setSelectedAlbum] = useState(null);
-  const [isAlbumDetailOpen, setIsAlbumDetailOpen] = useState(true);
   const [activeFilter, setActiveFilter] = useState('all');
   const [selectedDefectTypes, setSelectedDefectTypes] = useState([]);
   const [selectedLocations, setSelectedLocations] = useState([]);
@@ -617,7 +621,7 @@ function App() {
 
         if (isActive) {
           setAlbumItems(nextItems);
-          setSelectedAlbum(nextItems[0] ?? null);
+          setSelectedAlbum(null);
         }
       } catch {
         if (isActive) {
@@ -714,8 +718,15 @@ function App() {
   const selectedAlbumLocation = getRecordLocation(selectedAlbum);
 
   const handleSelectAlbum = async (item) => {
+    if (selectedAlbum?.objectKey === item?.objectKey) {
+      setSelectedAlbum(null);
+      setAlbumHoveredType('');
+      setAlbumVisibleTypes([]);
+      return;
+    }
+
+    setAlbumLoadError('');
     setSelectedAlbum(item);
-    setIsAlbumDetailOpen(true);
     setAlbumHoveredType('');
     setAlbumVisibleTypes([]);
 
@@ -749,7 +760,6 @@ function App() {
     setAlbumLoading(false);
     setAlbumLoadError('');
     setSelectedAlbum(null);
-    setIsAlbumDetailOpen(true);
     setActiveFilter('all');
     setSelectedLocations([]);
     setSelectedDefectTypes([]);
@@ -871,7 +881,6 @@ function App() {
       setCameraHoveredType('');
       setCameraVisibleTypes([]);
       setAlbumItems((items) => (uploadedRecord ? [uploadedRecord, ...items] : items));
-      setSelectedAlbum(uploadedRecord);
       setUploadState('done');
     } catch {
       setUploadState('error');
@@ -889,6 +898,7 @@ function App() {
     }
 
     try {
+      setAlbumLoadError('');
       await api.delete('/api/albums', {
         params: {
           objectKey: selectedAlbum.objectKey,
@@ -897,10 +907,11 @@ function App() {
       });
 
       setAlbumItems((currentItems) => {
-        const nextItems = currentItems.filter((item) => item.objectKey !== selectedAlbum.objectKey);
-        setSelectedAlbum(nextItems[0] ?? null);
-        return nextItems;
+        return currentItems.filter((item) => item.objectKey !== selectedAlbum.objectKey);
       });
+      setSelectedAlbum(null);
+      setAlbumHoveredType('');
+      setAlbumVisibleTypes([]);
     } catch {
       setAlbumLoadError(text.albumDeleteFailed);
     }
@@ -1077,7 +1088,7 @@ function App() {
                         d="M9 3.58c1.32 0 2.5.45 3.43 1.35l2.58-2.58A8.65 8.65 0 0 0 9 0 9 9 0 0 0 .94 4.97L3.95 7.3C4.66 5.17 6.65 3.58 9 3.58Z"
                       />
                     </svg>
-                    구글로 계속하기
+                    {'\uAD6C\uAE00\uB85C \uACC4\uC18D\uD558\uAE30'}
                   </button>
                 </>
               )}
@@ -1265,63 +1276,56 @@ function App() {
               <div className="detail-header">
                 <h3>{text.albumDetailTitle}</h3>
                 <div className="detail-actions">
-                  <button className="ghost-button compact" onClick={() => setIsAlbumDetailOpen((currentValue) => !currentValue)} type="button">
-                    {isAlbumDetailOpen ? text.albumDetailToggleClose : text.albumDetailToggleOpen}
-                  </button>
                   <button className="danger-button compact" onClick={handleDeleteAlbum} type="button">
                     <Trash2 size={16} />
                     {text.albumDelete}
                   </button>
                 </div>
               </div>
-              {isAlbumDetailOpen && (
-                <>
-                  <div className="preview-frame album-preview">
-                    {selectedAlbum.objectUrl ? (
-                      <AnalysisImageViewer
-                        alt={selectedAlbum.originalFileName}
-                        annotations={selectedAlbum.aiAnalysis?.annotations ?? []}
-                        emphasizedType={albumHoveredType}
-                        src={selectedAlbum.objectUrl}
-                        visibleTypes={albumVisibleTypes}
-                      />
+              <div className="preview-frame album-preview">
+                {selectedAlbum.objectUrl ? (
+                  <AnalysisImageViewer
+                    alt={selectedAlbum.originalFileName}
+                    annotations={selectedAlbum.aiAnalysis?.annotations ?? []}
+                    emphasizedType={albumHoveredType}
+                    src={selectedAlbum.objectUrl}
+                    visibleTypes={albumVisibleTypes}
+                  />
+                ) : (
+                  <span>{text.noImage}</span>
+                )}
+              </div>
+              <dl>
+                <div>
+                  <dt>{text.defectTypes}</dt>
+                  <dd className="type-chip-row">
+                    {selectedAlbumDisplayTypes.length > 0 ? (
+                      selectedAlbumDisplayTypes.map((type) => (
+                        <button
+                          className={albumVisibleTypes.includes(type) ? 'type-chip selected' : 'type-chip'}
+                          key={type}
+                          onClick={() => handleToggleVisibleType('album', type)}
+                          onMouseEnter={() => setAlbumHoveredType(type)}
+                          onMouseLeave={() => setAlbumHoveredType('')}
+                          type="button"
+                        >
+                          {type}
+                        </button>
+                      ))
                     ) : (
-                      <span>{text.noImage}</span>
+                      <span>{selectedAlbum.defectType ?? '-'}</span>
                     )}
-                  </div>
-                  <dl>
-                    <div>
-                      <dt>{text.defectTypes}</dt>
-                      <dd className="type-chip-row">
-                        {selectedAlbumDisplayTypes.length > 0 ? (
-                          selectedAlbumDisplayTypes.map((type) => (
-                            <button
-                              className={albumVisibleTypes.includes(type) ? 'type-chip selected' : 'type-chip'}
-                              key={type}
-                              onClick={() => handleToggleVisibleType('album', type)}
-                              onMouseEnter={() => setAlbumHoveredType(type)}
-                              onMouseLeave={() => setAlbumHoveredType('')}
-                              type="button"
-                            >
-                              {type}
-                            </button>
-                          ))
-                        ) : (
-                          <span>{selectedAlbum.defectType ?? '-'}</span>
-                        )}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt>{text.analyzedAt}</dt>
-                      <dd>{formatDate(selectedAlbum.savedAt)}</dd>
-                    </div>
-                    <div>
-                      <dt>{text.coordinates}</dt>
-                      <dd>{formatLocation(selectedAlbumLocation)}</dd>
-                    </div>
-                  </dl>
-                </>
-              )}
+                  </dd>
+                </div>
+                <div>
+                  <dt>{text.analyzedAt}</dt>
+                  <dd>{formatDate(selectedAlbum.savedAt)}</dd>
+                </div>
+                <div>
+                  <dt>{text.coordinates}</dt>
+                  <dd>{formatLocation(selectedAlbumLocation)}</dd>
+                </div>
+              </dl>
             </section>
           )}
         </section>

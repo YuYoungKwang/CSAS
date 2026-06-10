@@ -676,6 +676,22 @@ button {
   content: "\BD84\C11D";
 }
 
+.slide-status button {
+  min-width: 58px;
+  border: 0;
+  border-radius: 999px;
+  padding: 4px 9px;
+  background: transparent;
+  color: #5c7551;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.slide-status button.active {
+  background: #245d18;
+  color: #fffdf2;
+}
+
 .viewer-expand,
 .icon-button {
   display: inline-flex;
