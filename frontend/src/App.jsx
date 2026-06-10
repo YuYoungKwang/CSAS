@@ -47,6 +47,8 @@ const text = {
   uploadFailed: '\uC5C5\uB85C\uB4DC\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4. \uBC31\uC5D4\uB4DC\uB97C \uD655\uC778\uD574\uC8FC\uC138\uC694.',
   unsupportedCaptureType:
     '\uBAA8\uBC14\uC77C \uCE74\uBA54\uB77C \uC0AC\uC9C4 \uD615\uC2DD\uC774 \uC9C0\uC6D0\uB418\uC9C0 \uC54A\uC544\uC694. JPG, PNG, WEBP \uC774\uBBF8\uC9C0\uB85C \uB2E4\uC2DC \uC2DC\uB3C4\uD574\uC8FC\uC138\uC694.',
+  uploadTooLarge:
+    '\uC0AC\uC9C4 \uC6A9\uB7C9\uC774 \uD06C\uACE0 \uC788\uC5B4 \uC5C5\uB85C\uB4DC\uAC00 \uAC70\uBD80\uB418\uC5C8\uC5B4\uC694. \uD574\uC0C1\uB3C4\uAC00 \uB354 \uB0AE\uC740 \uC0AC\uC9C4\uC73C\uB85C \uB2E4\uC2DC \uC2DC\uB3C4\uD574\uC8FC\uC138\uC694.',
   result: '\uBD84\uC11D \uACB0\uACFC',
   waiting: '\uBD84\uC11D \uB300\uAE30',
   defectType: '\uADE0\uC5F4 \uC885\uB958',
@@ -224,6 +226,10 @@ function normalizePoint(point, width, height) {
 }
 
 function extractApiErrorMessage(error) {
+  if (error?.response?.status === 413) {
+    return text.uploadTooLarge;
+  }
+
   const responseData = error?.response?.data;
   if (typeof responseData === 'string' && responseData.trim()) {
     return responseData;
