@@ -37,6 +37,7 @@ const text = {
   main: '\uBA54\uC778',
   cameraTitle: '\uADE0\uC5F4 \uC0AC\uC9C4 \uCD2C\uC601',
   cameraHint: '\uCE74\uBA54\uB77C\uB85C \uCD2C\uC601\uD558\uAC70\uB098 \uC774\uBBF8\uC9C0\uB97C \uC5C5\uB85C\uB4DC\uD558\uC138\uC694.',
+  cameraTip: '\u203B\uC0AC\uC9C4 \uCD2C\uC601\uC2DC \uADF8\uB9BC\uC790\uAC00 \uC9C0\uC9C0 \uC54A\uAC8C \uCD2C\uC601\uD574\uC8FC\uC138\uC694.',
   takePhoto: '\uCE74\uBA54\uB77C \uC5F4\uAE30',
   choosePhoto: '\uC0AC\uC9C4 \uC120\uD0DD',
   uploadAnalyze: '\uBD84\uC11D \uC2DC\uC791',
@@ -1222,6 +1223,7 @@ function App() {
             </div>
           </div>
           <p className="screen-copy">{text.cameraHint}</p>
+          <p className="screen-tip">{text.cameraTip}</p>
 
           <div className="preview-frame">
             {previewUrl ? (
