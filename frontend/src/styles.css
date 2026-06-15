@@ -1069,11 +1069,12 @@ dd {
 }
 
 .album-detail-modal {
-  position: fixed;
+  position: absolute;
   inset: 0;
   z-index: 36;
   display: grid;
   align-items: end;
+  min-width: 0;
   padding: 18px;
   background: rgba(18, 29, 14, 0.56);
 }
@@ -1081,6 +1082,9 @@ dd {
 .album-detail-sheet {
   display: grid;
   gap: 16px;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
   max-height: min(84vh, 760px);
   overflow-y: auto;
   border: 1px solid #b8cfa4;
