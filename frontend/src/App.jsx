@@ -163,9 +163,44 @@ function getUniqueAnnotationTypes(annotations = []) {
   return [...new Set(names)];
 }
 
-function getAnnotationColor(index) {
-  const colors = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899'];
-  return colors[index % colors.length];
+function getAnnotationColor(annotationName) {
+  const normalizedName = String(annotationName ?? '')
+    .trim()
+    .toLowerCase();
+
+  const colorMap = {
+    normal: '#94a3b8',
+    safe: '#94a3b8',
+    '\uC815\uC0C1': '#94a3b8',
+    '\uC591\uD638': '#94a3b8',
+    crack: '#ef4444',
+    damage: '#ef4444',
+    '\uADE0\uC5F4': '#ef4444',
+    leakage: '#3b82f6',
+    leak: '#3b82f6',
+    '\uB204\uC218': '#3b82f6',
+    efflorescence: '#f59e0b',
+    '\uBC31\uD0DC': '#f59e0b',
+    peeling: '#8b5cf6',
+    '\uBC15\uB9AC': '#8b5cf6',
+    spalling: '#f97316',
+    '\uBC15\uB77D': '#f97316',
+    rebar: '#ec4899',
+    'rebar exposure': '#ec4899',
+    '\uCCA0\uADFC\uB178\uCD9C': '#ec4899',
+    contamination: '#14b8a6',
+    stain: '#14b8a6',
+    '\uC624\uC5FC': '#14b8a6',
+    breakage: '#eab308',
+    broken: '#eab308',
+    '\uD30C\uC190': '#eab308',
+    delamination: '#22c55e',
+    '\uB4E4\uB728\uC784': '#22c55e',
+    other: '#a855f7',
+    '\uAE30\uD0C0': '#a855f7',
+  };
+
+  return colorMap[normalizedName] ?? '#06b6d4';
 }
 
 function getAnnotationCenter(points, width, height) {
@@ -377,7 +412,7 @@ function AnalysisImageViewer({ src, annotations = [], alt = '', emphasizedType =
           const normalizedAnnotationName = annotationName.trim().toLowerCase();
           const isHighlighted = activeTypeSet.size > 0 && activeTypeSet.has(normalizedAnnotationName);
           const shouldFade = activeTypeSet.size > 0 && !activeTypeSet.has(normalizedAnnotationName);
-          const color = getAnnotationColor(index);
+          const color = getAnnotationColor(annotationName);
           const pointString = points.map((point) => `${point.x},${point.y}`).join(' ');
 
           return (
@@ -419,7 +454,7 @@ function AnalysisImageViewer({ src, annotations = [], alt = '', emphasizedType =
               imageSize.width,
               imageSize.height
             ).y}%`,
-            '--tooltip-color': getAnnotationColor(hoveredAnnotation.index),
+            '--tooltip-color': getAnnotationColor(getAnnotationClassName(hoveredAnnotation.annotation)),
           }}
         >
           {getAnnotationClassName(hoveredAnnotation.annotation)}
