@@ -181,6 +181,7 @@ public class AlbumQueryService {
                 record.userId(),
                 record.latitude(),
                 record.longitude(),
+                aiAnalysis,
                 AnalysisRecordSupport.getDefectFound(aiAnalysis),
                 AnalysisRecordSupport.getDefectType(aiAnalysis),
                 AnalysisRecordSupport.getAnnotationCount(aiAnalysis)

@@ -61,6 +61,7 @@ const text = {
   ratio: '\uACB0\uD568 \uBA74\uC801\uBE44',
   albumTitle: '\uBD84\uC11D \uC568\uBC94',
   albumDetailTitle: '\uC0C1\uC138 \uC815\uBCF4',
+  albumDetailSubtitle: '\uBD84\uC11D \uAE30\uB85D \uC0C1\uC138',
   albumLoading: '\uC568\uBC94 \uB85C\uB529 \uC911',
   albumLoadFailed: '\uC568\uBC94 \uB85C\uB529\uc5d0 \uC2E4\ud328\ud588\uc2b5\ub2c8\ub2e4.',
   albumDelete: '\uC0AD\uC81C',
@@ -1039,6 +1040,23 @@ function App() {
     }
   };
 
+  useEffect(() => {
+    if (!selectedAlbum) {
+      return undefined;
+    }
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        setSelectedAlbum(null);
+        setAlbumHoveredType('');
+        setAlbumVisibleTypes([]);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedAlbum]);
+
   const handleDeleteAlbum = async () => {
     if (!selectedAlbum?.objectKey) {
       return;
@@ -1422,65 +1440,94 @@ function App() {
               <p className="empty-state">{text.emptyAlbum}</p>
             )}
           </div>
-
-          {selectedAlbum && (
-            <section className="result-card">
-              <div className="detail-header">
-                <h3>{text.albumDetailTitle}</h3>
-                <div className="detail-actions">
-                  <button className="danger-button compact" onClick={handleDeleteAlbum} type="button">
-                    <Trash2 size={16} />
-                    {text.albumDelete}
-                  </button>
-                </div>
-              </div>
-              <div className="preview-frame album-preview">
-                {selectedAlbum.objectUrl ? (
-                  <AnalysisImageViewer
-                    alt={selectedAlbum.originalFileName}
-                    annotations={selectedAlbum.aiAnalysis?.annotations ?? []}
-                    emphasizedType={albumHoveredType}
-                    src={selectedAlbum.objectUrl}
-                    visibleTypes={albumVisibleTypes}
-                  />
-                ) : (
-                  <span>{text.noImage}</span>
-                )}
-              </div>
-              <dl>
-                <div>
-                  <dt>{text.defectTypes}</dt>
-                  <dd className="type-chip-row">
-                    {selectedAlbumDisplayTypes.length > 0 ? (
-                      selectedAlbumDisplayTypes.map((type) => (
-                        <button
-                          className={albumVisibleTypes.includes(type) ? 'type-chip selected' : 'type-chip'}
-                          key={type}
-                          onClick={() => handleToggleVisibleType('album', type)}
-                          onMouseEnter={() => setAlbumHoveredType(type)}
-                          onMouseLeave={() => setAlbumHoveredType('')}
-                          type="button"
-                        >
-                          {type}
-                        </button>
-                      ))
-                    ) : (
-                      <span>{selectedAlbum.defectType ?? '-'}</span>
-                    )}
-                  </dd>
-                </div>
-                <div>
-                  <dt>{text.analyzedAt}</dt>
-                  <dd>{formatDate(selectedAlbum.savedAt)}</dd>
-                </div>
-                <div>
-                  <dt>{text.coordinates}</dt>
-                  <dd>{formatLocation(selectedAlbumLocation)}</dd>
-                </div>
-              </dl>
-            </section>
-          )}
         </section>
+      )}
+
+      {view === 'album' && selectedAlbum && (
+        <div
+          aria-label={text.albumDetailTitle}
+          aria-modal="true"
+          className="album-detail-modal"
+          onClick={() => {
+            setSelectedAlbum(null);
+            setAlbumHoveredType('');
+            setAlbumVisibleTypes([]);
+          }}
+          role="dialog"
+        >
+          <section className="album-detail-sheet" onClick={(event) => event.stopPropagation()}>
+            <div className="album-detail-bar">
+              <div>
+                <span>{text.albumDetailSubtitle}</span>
+                <h3>{selectedAlbum.originalFileName}</h3>
+              </div>
+              <div className="album-detail-actions">
+                <button className="danger-button compact" onClick={handleDeleteAlbum} type="button">
+                  <Trash2 size={16} />
+                  {text.albumDelete}
+                </button>
+                <button
+                  aria-label={text.fullscreenClose}
+                  className="icon-button"
+                  onClick={() => {
+                    setSelectedAlbum(null);
+                    setAlbumHoveredType('');
+                    setAlbumVisibleTypes([]);
+                  }}
+                  type="button"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+
+            <div className="preview-frame album-preview">
+              {selectedAlbum.objectUrl ? (
+                <AnalysisImageViewer
+                  alt={selectedAlbum.originalFileName}
+                  annotations={selectedAlbum.aiAnalysis?.annotations ?? []}
+                  emphasizedType={albumHoveredType}
+                  src={selectedAlbum.objectUrl}
+                  visibleTypes={albumVisibleTypes}
+                />
+              ) : (
+                <span>{text.noImage}</span>
+              )}
+            </div>
+
+            <dl>
+              <div>
+                <dt>{text.defectTypes}</dt>
+                <dd className="type-chip-row">
+                  {selectedAlbumDisplayTypes.length > 0 ? (
+                    selectedAlbumDisplayTypes.map((type) => (
+                      <button
+                        className={albumVisibleTypes.includes(type) ? 'type-chip selected' : 'type-chip'}
+                        key={type}
+                        onClick={() => handleToggleVisibleType('album', type)}
+                        onMouseEnter={() => setAlbumHoveredType(type)}
+                        onMouseLeave={() => setAlbumHoveredType('')}
+                        type="button"
+                      >
+                        {type}
+                      </button>
+                    ))
+                  ) : (
+                    <span>{selectedAlbum.defectType ?? '-'}</span>
+                  )}
+                </dd>
+              </div>
+              <div>
+                <dt>{text.analyzedAt}</dt>
+                <dd>{formatDate(selectedAlbum.savedAt)}</dd>
+              </div>
+              <div>
+                <dt>{text.coordinates}</dt>
+                <dd>{formatLocation(selectedAlbumLocation)}</dd>
+              </div>
+            </dl>
+          </section>
+        </div>
       )}
     </main>
   );

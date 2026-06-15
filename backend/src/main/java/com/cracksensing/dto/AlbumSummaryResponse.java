@@ -10,6 +10,7 @@ public record AlbumSummaryResponse(
         String userId,
         Double latitude,
         Double longitude,
+        AiAnalysisResponse aiAnalysis,
         boolean defectFound,
         String defectType,
         int annotationCount
